@@ -11,7 +11,7 @@
 [![Lua](https://img.shields.io/badge/Lua-5.4.6-orange.svg)](https://lua.org)
 [![License](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
-**35 araç** · **57 Android API** · **18 Windows API** · **32 cheat kodu** · **39 paket tipi** · **22 DLL-doğrulamalı variant fonksiyonu** · **19 ban-risk kuralı**
+**39 araç** · **6832 gerçek item ID** · **57 Android API** · **18 Windows API** · **32 cheat kodu** · **39 paket tipi** · **22 DLL-doğrulamalı variant fonksiyonu** · **19 ban-risk kuralı**
 
 *SAHTE DEĞİL — GERÇEK VERİLERLE EĞİTİLDİ*
 
@@ -28,12 +28,13 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 | 📖 **[GENTA-HAX-DOCS](https://github.com/GENTA7740/GENTA-HAX-DOCS)** — geliştiricinin RESMİ dokümantasyonu | 57 Android + 18 Windows Lua fonksiyon imzası, 15 struct, 10 hook, 32 CheatCode enum'u, Discord webhook yapısı |
 | 🔬 **GENTAHAX v5.61 `GTInternal.dll`** binary analizi (MD5: `8f95ed4449dc4893f51d5380e31f8055`) | 19 bellek yaması ismi (Mod Fly, Ghost Ship...), 39 paket tipi, 22 variant fonksiyonu (OnTalkBubble, OnDialogRequest, OnFishStrike...), 62 ImGui fonksiyonu, gerçek protokol action'ları |
 | 📜 **Resmî örnek scriptler** | `Genta_ImDemo.lua` (451 satır ImGui demosu), `extender.lua` (453 satır gerçek mod menüsü), `Genta_DiscordWebhook.lua` |
+| 🆕 **[yoshinogaming/growtopia-item-id](https://github.com/yoshinogaming/growtopia-item-id)** — items.dat tabanlı GERÇEK eşya ID listesi | **6832 eşya** (ID 0–6831): `2=Dirt`, `3=Dirt Seed`, `112=Gems`, `6=Main Door` doğrulandı; 3383 gerçek seed çifti listeden türetildi |
 
 > Engine: **Lua 5.4.6** · Script yolları: `Android/media/GENTAHAX/Script/*.lua` (Android), `Script/*.lua` (Windows)
 
 ---
 
-## 🛠️ Araç Seti (35 araç)
+## 🛠️ Araç Seti (39 araç)
 
 ### 📚 Bilgi Tabanı — offline, her zaman çalışır
 | Araç | Açıklama |
@@ -51,7 +52,9 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 | `gh_imgui_api` | 62 ImGui fonksiyonu |
 | `gh_examples_list` / `gh_example_get` | Resmî örnek scriptler |
 | `gh_templates_list` / `gh_template_get` | 7 hazır şablon (Auto Collect, ESP, Varlist Logger...) |
-| `gh_item_lookup` | Eşya ID çerçevesi + `getItemByName` önerisi |
+| `gh_item_lookup` | Eşya ID çözümü — 6832'lik GERÇEK veritabanı + seed eşleri |
+| 🆕 `gh_item_db_search` | GERÇEK veritabanında serbest arama (isim veya ID, 6832 eşya) |
+| 🆕 `gh_item_db_info` | ID'nin tam bilgisi: isim, seed eşleri, komşu ID'ler |
 | `gh_snippet` | Fonksiyon için hazır kod parçası |
 | `gh_learn_lua_gentahax` | 7 konulu eğitim rehberi |
 
@@ -70,6 +73,8 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 | `gh_bridge_deploy` | Lua köprüsünü cihaza kur |
 | `gh_run_lua` | ⭐ Oyun içinde kod çalıştır (**önce risk analizi yapar!**) |
 | `gh_world_snapshot` | Canlı dünya görüntüsü |
+| 🆕 `gh_world_count_item` | ⭐⭐ **"Dünyada kaç tane X var?" — gerçek canlı sayım** (sadece okur, ban riski yok) |
+| 🆕 `gh_world_census` | Canlı dünyanın TAM eşya sayımı (en çok kullanılanlar fg/bg) |
 | `gh_player_info` | Dünyadaki tüm oyuncular |
 | `gh_inventory_dump` | Envanter dökümü |
 | `gh_stop_scripts` | Acil durdurma (killAllThread) |
@@ -102,6 +107,31 @@ Kullanıcı güvenliği birinci önceliktir. `gh_run_lua` her çalıştırmadan 
 - 🟢 **DÜŞÜK**: ESP/görsel katman, veri okuma, ImGui, webhook
 
 Güvenli mod (varsayılan AÇIK): yüksek riskli kod `force=true` ile bile çalışmaz — `GENTAHAX_SAFE_MODE=0` gerekir.
+
+---
+
+## 🟤 "Dünyada Kaç Tane X Var?" — Gerçek Canlı Cevap
+
+Kullanıcı AI'ına `dünyada kaç tane dirt var` diye sorduğunda, AI `gh_world_count_item("Dirt")` çağırır ve **oyunun canlı belleğindeki TÜM tile'lar taranır**:
+
+```json
+{
+  "soru": "'BUYDIRT dünyasında kaç tane Dirt var?",
+  "cevap": "264 adet Dirt (ID 2) — ön plan: 214, arka plan: 50",
+  "taranan_tile": 6000,
+  "on_plan_fg": 214,
+  "arka_plan_bg": 50,
+  "canli_dogrulama": { "oyun_dedi": "Dirt", "veritabani_dedi": "Dirt", "uyusuyor": true },
+  "ban_riski": "YOK — sadece okuma (RAM taraması), sunucuya hiçbir paket gönderilmedi"
+}
+```
+
+Nasıl çalışır:
+1. **Eşya çözümü**: "Dirt" → ID 2 (6832'lik GERÇEK veritabanından; belirsiz isimde asla tahmin etmez, aday listeler)
+2. **Canlı tarama**: köprü `getTile()` vektörünü tarar — **sadece okur**, sunucuya paket gitmez → ban riski YOK
+3. **Çapraz doğrulama**: oyunun kendi `getItemByID(2).name` sonucu veritabanıyla karşılaştırılır
+
+> Bu akış uçtan uca test edildi: gerçek Lua runtime'ında 6000 tile'lık simüle dünya, dosya-IPC köprüsü ve MCP protokolü üzerinden 30/30 test geçti (`scripts/test_world_count_e2e.py`).
 
 ---
 
@@ -163,7 +193,7 @@ Artık AI gerçek zamanlı dünya/oyuncu/envanter verisi okuyabilir ve güvenli 
 ```
 ┌─────────────┐   MCP (stdio)   ┌──────────────┐   bridge_in.txt    ┌──────────────────┐
 │  Claude /    │ ◄────────────► │  server.py   │ ─────────────────► │ gentahax_bridge  │
-│  Cursor AI   │    35 araç     │  knowledge   │ ◄───────────────── │     .lua         │
+│  Cursor AI   │    39 araç     │  knowledge   │ ◄───────────────── │     .lua         │
 └─────────────┘                 │  bridge      │   bridge_out.txt   │ (oyun içinde     │
                                 └──────────────┘                    │  sürekli thread) │
                                                                     └──────────────────┘
@@ -187,8 +217,8 @@ MIT License — bkz. [LICENSE](LICENSE).
 
 ### 👑 mr_berk
 
-`GENTAHAX MCP v1.0.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 35 araç
+`GENTAHAX MCP v1.1.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 39 araç · 6832 gerçek eşya ID
 
-*Veri: OFFICIAL GENTA-HAX-DOCS + GENTAHAX v5.61 DLL doğrulaması (Lua 5.4.6)*
+*Veri: OFFICIAL GENTA-HAX-DOCS + GENTAHAX v5.61 DLL doğrulaması (Lua 5.4.6) + items.dat tabanlı gerçek item ID listesi*
 
 </div>

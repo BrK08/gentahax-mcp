@@ -32,6 +32,21 @@ _PROTOCOL = _load("protocol.json")
 _BAN_RULES = _load("ban_rules.json")
 _TEMPLATES = _load("templates.json")
 
+# GERÇEK Growtopia item ID veritabanı (github.com/yoshinogaming/growtopia-item-id, items.dat tabanlı)
+_ITEMS = _load("items.json")
+_ITEMS_BY_ID = {int(k): v for k, v in _ITEMS["items"].items()}
+_NAME_TO_ID = {}
+for _iid, _nm in sorted(_ITEMS_BY_ID.items()):
+    _NAME_TO_ID.setdefault(_nm.lower(), _iid)  # ilk (en düşük ID) kazanır
+# Gerçek seed çiftleri — listeden TÜRETİLDİ (asla ID+1 varsayılmadı):
+# 'X Seed' adlı item için ID-1 gerçekten 'X' adını taşıyorsa çift kurulur.
+_SEED_OF = {}
+_BASE_OF = {}
+for _iid, _nm in _ITEMS_BY_ID.items():
+    if _nm.endswith(" Seed") and _ITEMS_BY_ID.get(_iid - 1) == _nm[:-5]:
+        _SEED_OF[_iid - 1] = _iid
+        _BASE_OF[_iid] = _iid - 1
+
 
 def get_api(platform="android"):
     """platform: 'android' | 'windows'"""
@@ -51,6 +66,80 @@ def get_protocol():
 
 def get_ban_rules():
     return _BAN_RULES
+
+# ---------------------------------------------------------------------------
+# Gerçek item ID veritabanı (6832 esya)
+# ---------------------------------------------------------------------------
+
+def items_count():
+    return len(_ITEMS_BY_ID)
+
+
+def items_source():
+    return _ITEMS["source"]
+
+
+def item_by_id(item_id):
+    """ID -> isim (yoksa None)"""
+    try:
+        return _ITEMS_BY_ID.get(int(item_id))
+    except (TypeError, ValueError):
+        return None
+
+
+def items_search(query, limit=30):
+    """Isim/ID arama: önce exact eşleşme, sonra substring. Sonuç: [{'id','name','is_seed'}]"""
+    q = str(query).strip().lower()
+    if not q:
+        return []
+    # Saf sayı → exact ID araması (prefix kirliliği olmasın: '2' → 2, 20, 200 DEĞIL sadece 2)
+    if q.isdigit():
+        iid = int(q)
+        if iid in _ITEMS_BY_ID:
+            return [{"id": iid, "name": _ITEMS_BY_ID[iid], "is_seed": iid in _BASE_OF}]
+    exact = []
+    partial = []
+    for iid, name in sorted(_ITEMS_BY_ID.items()):
+        nl = name.lower()
+        if nl == q:
+            exact.append(iid)
+        elif q in nl:
+            partial.append(iid)
+        if len(exact) + len(partial) >= max(limit, 60):
+            break
+    out_ids = exact + [i for i in partial if i not in exact]
+    return [{"id": i, "name": _ITEMS_BY_ID[i], "is_seed": i in _BASE_OF}
+            for i in out_ids[:limit]]
+
+
+def item_resolve(query):
+    """'Dirt' / '2' gibi sorguyu TEK bir (id, name) çiftine çevirir.
+    Belirsizse candidates listesiyle döner (asla tahmin etmez)."""
+    results = items_search(query, limit=10)
+    if not results:
+        return {"resolved": False, "reason": "not_found", "candidates": []}
+    # exact isim eşleşmesi varsa onu al
+    q = str(query).strip().lower()
+    for r in results:
+        if r["name"].lower() == q:
+            return {"resolved": True, "id": r["id"], "name": r["name"]}
+    if q.isdigit() and len(results) == 1:
+        return {"resolved": True, "id": results[0]["id"], "name": results[0]["name"]}
+    if len(results) == 1:
+        return {"resolved": True, "id": results[0]["id"], "name": results[0]["name"]}
+    return {"resolved": False, "reason": "ambiguous",
+            "candidates": [{"id": r["id"], "name": r["name"]} for r in results[:10]]}
+
+
+def seed_of(item_id):
+    """Item'in GERÇEK seed ID'si (listedeki çiftlerden; yoksa None)."""
+    return _SEED_OF.get(int(item_id))
+
+
+def base_of(item_id):
+    """Seed'in GERÇEK ana item ID'si (yoksa None)."""
+    return _BASE_OF.get(int(item_id))
+
 
 # ---------------------------------------------------------------------------
 # Search helpers
@@ -280,4 +369,7 @@ def stats():
         "templates": len(_TEMPLATES["templates"]),
         "imgui_functions": len(IMGUI_FUNCTIONS),
         "examples": len(examples_list()),
+        "items_db_count": items_count(),
+        "items_db_source": _ITEMS["source"]["repo"],
+        "items_db_seed_pairs": len(_SEED_OF),
     }

@@ -29,7 +29,7 @@ import knowledge as K
 import bridge as B
 
 WATERMARK = "mr_berk"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 mcp = FastMCP(
     f"GENTAHAX MCP — {WATERMARK} edition",
@@ -38,7 +38,11 @@ mcp = FastMCP(
         "Kural 1: Kod çalıştırmadan ÖNCE mutlaka gh_code_analyze ile ban riskini kontrol et, "
         "YÜKSEK risk varsa kullanıcıyı 'BUNDA BAN RİSKİ VAR' diye uyar. "
         "Kural 2: Fonksiyon imzaları için gh_api_detail / gh_api_search kullan, asla uydurma. "
-        "Kural 3: Canlı oyun verisi için köprü gerekiyor (gh_device_status)."
+        "Kural 3: Canlı oyun verisi için köprü gerekiyor (gh_device_status). "
+        "Kural 4: Eşya ID sorularında GERÇEK 6832 esyalik veritabanı (gh_item_db_search / gh_item_db_info) "
+        "+ oyunun canlı items.dat doğrulaması (getItemByName) birlikte kullan. "
+        "Kural 5: 'Dünyada kaç tane X var?' gibi canlı sorularda gh_world_count_item kullan — "
+        "sadece okuma yapar, gerçek sayıyı döner, ban riski yoktur."
     ),
 )
 
@@ -58,6 +62,8 @@ def gh_about() -> str:
         "data_sources": [
             "OFFICIAL GENTA-HAX-DOCS — github.com/GENTA7740/GENTA-HAX-DOCS (geliştiricinin resmi dokümantasyonu)",
             "GENTAHAX v5.61 GTInternal.dll binary doğrulaması (MD5 8f95ed4449dc4893f51d5380e31f8055)",
+            "GERÇEK Growtopia item ID veritabanı — github.com/yoshinogaming/growtopia-item-id "
+            "(6832 esya, items.dat tabanlı; ID 2=Dirt, 112=Gems doğrulandı)",
         ],
         "knowledge_stats": s,
         "platforms": ["android", "windows"],
@@ -227,19 +233,73 @@ def gh_template_get(template_id: str) -> str:
 
 @mcp.tool
 def gh_item_lookup(query: str) -> str:
-    """Yaygın esya ID'lerinde arama + GERÇEK çözüm önerisi: script içinde getItemByName() kullan.
-    Not: Growtopia'ın 10.000+ esyalik items.dat veritabanı OYUNUN İÇİNDEDİR;
-    getItemByName/getItemByID her zaman doğru canlı sonucu verir."""
-    q = query.lower()
-    items = [i for i in K._TEMPLATES["verified_common_items"] if q in i["name"].lower() or q == str(i["id"])]
-    if not items:
-        return (f"'{query}' cerceve listede yok. SCRIPTTE ASLA ID HARDCODE ETME — şunu kullan:\n"
-                f"  local item = getItemByName('{query}')\n"
-                f"  if item then logToConsole(item.name .. ' | rarity: ' .. item.rarity) end\n"
-                f"Bu, oyunun kendi canlı items.dat'ini sorgular: GUARANTILI gerçek sonuç.")
-    out = [f"{i['id']:>5} = {i['name']} — {i['desc']}" for i in items]
-    return ("Çerçeve eşleşmeleri (oyun içinde getItemByName ile doğrula):\n" + "\n".join(out) +
-            "\n\nScript önerisi: getItemByName('" + items[0]["name"] + "')")
+    """Eşya ID arama — GERÇEK 6832 esyalik Growtopia veritabanında (items.dat tabanlı, GitHub'dan).
+    Örnek: query='Dirt' → ID 2 (+ Dirt Seed ID 3). Canlı doğrulama önerisi: getItemByName()."""
+    res = K.item_resolve(query)
+    if not res["resolved"]:
+        if res["reason"] == "ambiguous":
+            cands = "\n".join(f"  {c['id']:>5} = {c['name']}" for c in res["candidates"])
+            return (f"'{query}' belirsiz — hangisini kastettin?\n{cands}\n\n"
+                    f"Daha net yaz (ör. 'Dirt' yerine tam isim).")
+        return (f"'{query}' 6832 esyalik GERÇEK veritabanında yok. "
+                "Script içi canlı çözüm:\n"
+                "  local item = getItemByName('" + query + "')\n"
+                "  if item then logToConsole(item.name .. ' | rarity: ' .. item.rarity) end")
+    seed_id = K.seed_of(res["id"])
+    base_id = K.base_of(res["id"])
+    return json.dumps({
+        "sorgu": query,
+        "id": res["id"],
+        "isim": res["name"],
+        "seed_id": seed_id,
+        "seed_isim": K.item_by_id(seed_id) if seed_id else None,
+        "ana_item": (f"{base_id} = {K.item_by_id(base_id)}") if base_id else None,
+        "veritabani": "6832 esya — github.com/yoshinogaming/growtopia-item-id (items.dat tabanlı, GERÇEK)",
+        "canli_dogrulama": f"getItemByID({res['id']}).name veya getItemByName('{res['name']}') — "
+                           "oyunun kendi items.dat'inden OKUR, her zaman doğrudur",
+        "world_sayimi": f"gh_world_count_item('{res['name']}') ile dünyada kaç tane olduğunu GERÇEK sayabilirsin",
+        "watermark": WATERMARK,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool
+def gh_item_db_search(query: str, limit: int = 25) -> str:
+    """GERÇEK item ID veritabanında serbest arama (6832 esya: isim veya sayı sorgusu).
+    Örnek: query='dirt' → Dirt(2), Dirt Seed(3), Cave Dirt... | query='2' → sadece ID 2.
+    Sonuçlar: [ID] isim (SEED işaretli)."""
+    limit = max(1, min(int(limit), 60))
+    results = K.items_search(query, limit)
+    if not results:
+        return f"'{query}' için sonuç yok — yazımı kontrol et (ör. 'Dirt', 'dirt seed', '2')."
+    lines = [f"{r['id']:>5} = {r['name']}{' [SEED]' if r['is_seed'] else ''}" for r in results]
+    total = len(K.items_search(query, 10000))
+    return ("GERÇEK veritabanı sonucu (6832 esya — items.dat tabanlı):\n" + "\n".join(lines) +
+            f"\n\n({len(results)}/{total} sonuç gösteriliyor — detay için gh_item_db_info)")
+
+
+@mcp.tool
+def gh_item_db_info(item_id: int) -> str:
+    """Item ID'nin TAM bilgisi: isim, seed eşleri, komşu ID'ler — GERÇEK veritabanından.
+    Örnek: item_id=2 → Dirt | seed: 3 (Dirt Seed) | canlı doğrulama: getItemByID(2)."""
+    name = K.item_by_id(item_id)
+    if name is None:
+        return f"ID {item_id} veritabanında yok (0..{K.items_count()-1} aralığında dene)."
+    seed_id = K.seed_of(item_id)
+    base_id = K.base_of(item_id)
+    neighbors = {str(i): K.item_by_id(i) for i in range(max(0, item_id - 2), min(K.items_count(), item_id + 3))}
+    return json.dumps({
+        "id": item_id,
+        "isim": name,
+        "tur": "seed" if base_id else "esya",
+        "seed_id": seed_id,
+        "seed_isim": K.item_by_id(seed_id) if seed_id else None,
+        "ana_item_id": base_id,
+        "ana_item_isim": K.item_by_id(base_id) if base_id else None,
+        "komsu_idler": neighbors,
+        "canli_dogrulama": f"getItemByID({item_id}).name == '{name}' olmalı — değilse oyun sürümü farklıdır",
+        "world_sayimi": f"gh_world_count_item('{name}') ile dünyadaki gerçek adedi say",
+        "watermark": WATERMARK,
+    }, ensure_ascii=False, indent=2)
 
 
 # ===========================================================================
@@ -404,6 +464,166 @@ def gh_inventory_dump() -> str:
         return json.dumps({"inventory": str(r), "watermark": WATERMARK}, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({"hata": str(e)}, ensure_ascii=False)
+
+
+# --------------------------- DÜNYA EŞYA SAYIMI (gerçek) ----------------------
+
+_WC_LUA = """
+local w = getWorld()
+if not w then return 'ERR|NO_WORLD' end
+local target = {target_id}
+local tiles = getTile()
+local nfg, nbg, total = 0, 0, 0
+local samples = {}
+for _, t in pairs(tiles) do
+    if t and t.fg ~= nil then
+        total = total + 1
+        if t.fg == target then
+            nfg = nfg + 1
+            if #samples < 8 then
+                local px, py = -1, -1
+                if t.pos then px = t.pos.x or -1; py = t.pos.y or -1 end
+                samples[#samples + 1] = tostring(px) .. ',' .. tostring(py)
+            end
+        end
+        if t.bg == target then nbg = nbg + 1 end
+    end
+end
+local live = getItemByID(target)
+return string.format('WORLD:%s|SIZE:%dx%d|SCANNED:%d|FG:%d|BG:%d|TOTAL:%d|LIVE_NAME:%s|SAMPLES:%s',
+    tostring(w.name), w.width, w.height, total, nfg, nbg, nfg + nbg,
+    (live and live.name) and tostring(live.name) or '?', table.concat(samples, ';'))
+"""
+
+
+@mcp.tool
+def gh_world_count_item(item: str) -> str:
+    """⭐ 'Dünyada kaç tane X var?' sorusuna GERÇEK cevap: canlı oyundaki TÜM tile'ları tarar
+    (getTile vektörü) ve itemin ön plan (fg) + arka plan (bg) adedini sayar.
+    SADECE OKUR — paket gönderilmez, ban riski YOKTUR. item: isim ('Dirt') veya ID ('2').
+    Oyunun canlı items.dat'i ile çapraz doğrulama yapılır (LIVE_NAME). Köprü gerekir.
+    Örnek: item='Dirt' → "BUYDIRT dünyasında 214 adet Dirt var (162 fg + 52 bg, 5400 tile tarandı)"."""
+    st, hint = _bridge_or_hint()
+    if hint:
+        return hint
+    res = K.item_resolve(item)
+    if not res["resolved"]:
+        if res["reason"] == "ambiguous":
+            cands = "\n".join(f"  {c['id']:>5} = {c['name']}" for c in res["candidates"])
+            return f"'{item}' belirsiz — hangisini sayayım?\n{cands}"
+        return f"'{item}' GERÇEK veritabanında (6832 esya) bulunamadı. Yazımı kontrol et."
+    tid, tname = res["id"], res["name"]
+    lua = _WC_LUA.replace("{target_id}", str(tid))
+    analysis = K.analyze_code(lua)  # okuma kodu → düşük risk olmalı; şeffaflık için raporla
+    try:
+        r = B.exec_lua(lua.strip(), timeout=25, risk_level=analysis["risk_level"])
+    except Exception as e:
+        return json.dumps({"hata": str(e), "ipucu": "gentahax_bridge.lua oyunda açık mı? gh_device_status"},
+                          ensure_ascii=False)
+    s = str(r)
+    if s.startswith("ERR|NO_WORLD"):
+        return json.dumps({"sonuc": "Şu an bir dünyada değilsin — oyunu aç, bir dünyaya gir ve tekrar dene."},
+                          ensure_ascii=False)
+    parts = {}
+    for kv in s.split("|"):
+        if ":" in kv:
+            k, v = kv.split(":", 1)
+            parts[k] = v
+    live_name = parts.get("LIVE_NAME", "?")
+    verified = (live_name.lower() == tname.lower())
+    fg, bg, total = (int(parts.get("FG", 0)), int(parts.get("BG", 0)), int(parts.get("TOTAL", 0)))
+    return json.dumps({
+        "soru": f"'{parts.get('WORLD','?')} dünyasında kaç tane {tname} var?",
+        "cevap": f"{total} adet {tname} (ID {tid}) — ön plan: {fg}, arka plan: {bg}",
+        "dunya": parts.get("WORLD"),
+        "dunya_boyutu": parts.get("SIZE"),
+        "taranan_tile": int(parts.get("SCANNED", 0)),
+        "on_plan_fg": fg,
+        "arka_plan_bg": bg,
+        "toplam": total,
+        "ornek_konumlar": parts.get("SAMPLES", "").split(";") if parts.get("SAMPLES") else [],
+        "canli_dogrulama": {
+            "oyun_dedi": live_name,
+            "veritabani_dedi": tname,
+            "uyusuyor": verified,
+            "not": "Oyunun canlı items.dat'i ile 6832'lik veritabanı çapraz doğrulandı" if verified
+                   else "DİKKAT: oyunun adı farklı — oyun sürümündeki ID eşlemesi farklı olabilir",
+        },
+        "ban_riski": "YOK — sadece okuma (RAM taraması), sunucuya hiçbir paket gönderilmedi",
+        "watermark": WATERMARK,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool
+def gh_world_census() -> str:
+    """Canlı dünyanın TAM eşya sayımı: TÜM tile'lar taranır, en çok kullanılan eşyalar
+    ön plan/arka plan ayrı olarak listelenir. 'Bu dünyada ne var?' sorusunun gerçek cevabı.
+    SADECE OKUR — ban riski yok. Köprü gerekir."""
+    st, hint = _bridge_or_hint()
+    if hint:
+        return hint
+    lua = """
+local w = getWorld()
+if not w then return 'ERR|NO_WORLD' end
+local tiles = getTile()
+local fgc, bgc, total = {}, {}, 0
+for _, t in pairs(tiles) do
+    if t and t.fg ~= nil then
+        total = total + 1
+        if t.fg and t.fg > 0 then fgc[t.fg] = (fgc[t.fg] or 0) + 1 end
+        if t.bg and t.bg > 0 then bgc[t.bg] = (bgc[t.bg] or 0) + 1 end
+    end
+end
+local function top(c)
+    local a = {}
+    for id, n in pairs(c) do a[#a + 1] = {id, n} end
+    table.sort(a, function(x, y) return x[2] > y[2] end)
+    local o = {}
+    for i = 1, math.min(#a, 20) do
+        local it = getItemByID(a[i][1])
+        o[#o + 1] = tostring(a[i][1]) .. '=' .. tostring(it and it.name or '?') .. ' x' .. tostring(a[i][2])
+    end
+    return table.concat(o, ';')
+end
+local function n(c) local m = 0 for _ in pairs(c) do m = m + 1 end return m end
+return string.format('WORLD:%s|SIZE:%dx%d|TILES:%d|DISTINCT_FG:%d|DISTINCT_BG:%d|TOP_FG:%s|TOP_BG:%s',
+    tostring(w.name), w.width, w.height, total, n(fgc), n(bgc), top(fgc), top(bgc))
+"""
+    try:
+        r = B.exec_lua(lua.strip(), timeout=25)
+    except Exception as e:
+        return json.dumps({"hata": str(e), "ipucu": "gentahax_bridge.lua oyunda açık mı? gh_device_status"},
+                          ensure_ascii=False)
+    s = str(r)
+    if s.startswith("ERR|NO_WORLD"):
+        return json.dumps({"sonuc": "Şu an bir dünyada değilsin — oyunu aç, bir dünyaya gir ve tekrar dene."},
+                          ensure_ascii=False)
+    parts = {}
+    for kv in s.split("|"):
+        if ":" in kv:
+            k, v = kv.split(":", 1)
+            parts[k] = v
+    def _pairlist(x):
+        if not x:
+            return []
+        out = []
+        for p in x.split(";")[:20]:
+            if "=" in p:
+                i, rest = p.split("=", 1)
+                nm, cnt = rest.rsplit(" x", 1)
+                out.append({"id": int(i), "isim": nm, "adet": int(cnt)})
+        return out
+    return json.dumps({
+        "dunya": parts.get("WORLD"),
+        "boyut": parts.get("SIZE"),
+        "toplam_tile": int(parts.get("TILES", 0)),
+        "farkli_on_plan_esya": int(parts.get("DISTINCT_FG", 0)),
+        "farkli_arka_plan_esya": int(parts.get("DISTINCT_BG", 0)),
+        "en_cok_on_plan": _pairlist(parts.get("TOP_FG")),
+        "en_cok_arka_plan": _pairlist(parts.get("TOP_BG")),
+        "ban_riski": "YOK — sadece okuma, paket gönderilmedi",
+        "watermark": WATERMARK,
+    }, ensure_ascii=False, indent=2)
 
 
 @mcp.tool

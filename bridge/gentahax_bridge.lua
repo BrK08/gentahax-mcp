@@ -130,4 +130,58 @@ function mcp_inventory_dump()
     return table.concat(out, ", ")
 end
 
-logToConsole("[MCP BRIDGE] kurulum tamam — mr_berk")
+-- v1.1 (mr_berk): DÜNYA EŞYA SAYIMI — 'kac tane X var?' sorusuna GERÇEK cevap
+-- getTile() vektörünü tarar; sadece OKUR, paket gonderilmez, ban riski yoktur.
+function mcp_world_item_counts(ids_csv)
+    local w = getWorld()
+    if not w then return "ERR|NO_WORLD" end
+    local want = {}
+    for id in tostring(ids_csv):gmatch("%d+") do
+        want[tonumber(id)] = { fg = 0, bg = 0 }
+    end
+    local total = 0
+    for _, t in pairs(getTile()) do
+        if t and t.fg ~= nil then
+            total = total + 1
+            if want[t.fg] then want[t.fg].fg = want[t.fg].fg + 1 end
+            if want[t.bg] then want[t.bg].bg = want[t.bg].bg + 1 end
+        end
+    end
+    local out = {}
+    for id, c in pairs(want) do
+        out[#out + 1] = string.format("%d=%d/%d", id, c.fg, c.bg)
+    end
+    table.sort(out)
+    return string.format("WORLD:%s|SIZE:%dx%d|TILES:%d|COUNTS:%s",
+        tostring(w.name), w.width, w.height, total, table.concat(out, ";"))
+end
+
+-- v1.1 (mr_berk): DÜNYA SAYIMI — tüm esyalari fg/bg adetine göre listeler
+function mcp_world_census()
+    local w = getWorld()
+    if not w then return "ERR|NO_WORLD" end
+    local fgc, bgc, total = {}, {}, 0
+    for _, t in pairs(getTile()) do
+        if t and t.fg ~= nil then
+            total = total + 1
+            if t.fg and t.fg > 0 then fgc[t.fg] = (fgc[t.fg] or 0) + 1 end
+            if t.bg and t.bg > 0 then bgc[t.bg] = (bgc[t.bg] or 0) + 1 end
+        end
+    end
+    local function top(c)
+        local a = {}
+        for id, n in pairs(c) do a[#a + 1] = { id, n } end
+        table.sort(a, function(x, y) return x[2] > y[2] end)
+        local o = {}
+        for i = 1, math.min(#a, 20) do
+            local it = getItemByID(a[i][1])
+            o[#o + 1] = tostring(a[i][1]) .. "=" .. tostring(it and it.name or "?") .. " x" .. tostring(a[i][2])
+        end
+        return table.concat(o, ";")
+    end
+    local function n(c) local m = 0 for _ in pairs(c) do m = m + 1 end return m end
+    return string.format("WORLD:%s|SIZE:%dx%d|TILES:%d|DISTINCT_FG:%d|DISTINCT_BG:%d|TOP_FG:%s|TOP_BG:%s",
+        tostring(w.name), w.width, w.height, total, n(fgc), n(bgc), top(fgc), top(bgc))
+end
+
+logToConsole("[MCP BRIDGE] kurulum tamam — mr_berk v1.1 (item sayimi hazir)")
