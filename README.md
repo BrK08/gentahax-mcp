@@ -151,6 +151,37 @@ Hazır şablonu **olmayan** her istek de çalışır: AI bilgi tabanından (ger�
 
 ---
 
+## 🤖 Hangi AI ile Çalışır? — HERHANGİ BİRİ ile
+
+**Yol 1 — MCP destekleyen uygulama** (config dosyası yeterli, `chat.py` GEREKMEZ):
+Claude Desktop · Cursor · VS Code (Copilot) · Windsurf · Zed · Cline → bkz. [KURULUM.md](KURULUM.md)
+
+**Yol 2 — `chat.py` ile HERHANGİ BİR AI** (OpenAI-uyumlu her sağlayıcı):
+
+```bat
+python chat.py --list-ai                          # hangi AI'ler destekli? (10 sağlayıcı)
+python chat.py --check                            # anahtarsız MCP self-test (ilk test komutu)
+python chat.py --provider openai  --api-key sk-... --ask "dirt kaç numara?"
+python chat.py --provider deepseek --api-key sk-...                 # interaktif sohbet
+python chat.py --provider ollama  --model llama3.1                  # ÜCRETSİZ, lokal, anahtarsız
+python chat.py --provider custom  --base-url http://localhost:1234/v1 --model benim-modelim
+```
+
+| Sağlayıcı | Varsayılan model | Anahtar |
+|---|---|---|
+| `openai` | gpt-4o-mini | platform.openai.com |
+| `deepseek` | deepseek-chat | platform.deepseek.com (çok ucuz) |
+| `glm` | glm-4-flash | bigmodel.cn — ücretsiz katmanı var |
+| `gemini` | gemini-2.0-flash | Google AI Studio — ücretsiz anahtar |
+| `openrouter` | 300+ model | tek anahtarla hepsi |
+| `qwen` / `mistral` | qwen-plus / mistral-small | DashScope / console.mistral.ai |
+| `ollama` / `lmstudio` | llama3.1 / local-model | **ANAHTAR GEREKMEZ** (lokal, ücretsiz) |
+| `custom` | sen belirt | herhangi bir OpenAI-uyumlu uç |
+
+`chat.py` arka planda AI ↔ 40 MCP aracı arasında **tool-calling döngüsü** kurar: AI istediği aracı çağırır → gerçek sonuç modele döner → nihai cevap. Güvenlik sistem prompt'a gömülü: AI yüksek riskli kodda `gh_code_analyze` yapıp **"⚠️ BUNDA BAN RİSKİ VAR"** demeden `gh_run_lua` çağıramaz. Kanıt: `tests/test_chat_agent.py` (15/15).
+
+---
+
 ## 🚀 Kurulum
 
 > 📚 **Sıfırdan başlayan biri için tam rehber:** **[KURULUM.md](KURULUM.md)** (Türkçe) · [INSTALL.md](INSTALL.md) (English) — gereksinimler, adım adım kurulum, sorun giderme ve SSS dahil.
@@ -236,7 +267,7 @@ MIT License — bkz. [LICENSE](LICENSE).
 
 ### 👑 mr_berk
 
-`GENTAHAX MCP v1.2.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
+`GENTAHAX MCP v1.3.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
 
 *Veri: OFFICIAL GENTA-HAX-DOCS + GENTAHAX v5.61 DLL doğrulaması (Lua 5.4.6) + items.dat tabanlı gerçek item ID listesi*
 

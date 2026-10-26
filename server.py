@@ -29,7 +29,7 @@ import knowledge as K
 import bridge as B
 
 WATERMARK = "mr_berk"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 mcp = FastMCP(
     f"GENTAHAX MCP — {WATERMARK} edition",

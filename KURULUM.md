@@ -5,7 +5,7 @@
 > Windows görselleri esas alınmıştır; Android farkları ayrıca işaretlenmiştir.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.2.0 · 40 araç · 6832 gerçek item ID
+👑 <b>mr_berk</b> edition — v1.3.0 · 40 araç · 6832 gerçek item ID
 </div>
 
 ---
@@ -161,6 +161,42 @@ MCP sunucusu **PC'de** çalışır ve telefona **USB (adb)** ile bağlanır:
 
 > Claude Desktop **PC'de** açık kalır; telefon USB ile bağlıyken AI oyununa canlı erişir.
 
+### 🤖 Adım 4B — Claude Desktop YOK, HERHANGİ BİR AI kullanmak istiyorum
+
+Config dosyası filan istemiyorsan **`chat.py`** hazır: ChatGPT, Gemini, GLM, DeepSeek, Qwen, Mistral, OpenRouter — hatta **anahtarsız ücretsiz lokal AI (Ollama/LM Studio)** — hepsi bağlanır:
+
+```bat
+cd C:\gentahax-mcp
+
+:: 1) Önce MCP tarafını test et (ANAHTAR GEREKMEZ — kurulum doğru mu gör):
+python chat.py --check
+
+:: 2) Hangi AI'ler destekli, listele:
+python chat.py --list-ai
+
+:: 3) AI'nı bağla (örnekler):
+python chat.py --provider deepseek --api-key sk-... --ask "dirt kaç numara?"
+python chat.py --provider gemini   --api-key AIza...                  :: interaktif sohbet
+python chat.py --provider ollama   --model llama3.1                   :: ÜCRETSİZ, lokal, anahtarsız
+
+:: 4) İstersen kalıcı ayar (her komutta --api-key yazmazsın):
+set GENTAHAX_AI_PROVIDER=deepseek
+set DEEPSEEK_API_KEY=sk-...
+python chat.py --ask "dünyada kaç tane dirt var?"
+```
+
+| Sağlayıcı | Anahtar nereden? | Not |
+|---|---|---|
+| `deepseek` | platform.deepseek.com | en ucuz seçeneklerden |
+| `gemini` | aistudio.google.com | **ücretsiz** anahtar |
+| `glm` | bigmodel.cn | glm-4-flash ücretsiz katman |
+| `openrouter` | openrouter.ai | tek anahtarla 300+ model |
+| `ollama` | **anahtar YOK** | ollama.com → `ollama pull llama3.1` — tamamen lokal |
+| `lmstudio` | **anahtar YOK** | lmstudio.ai → Developer → sunucuyu aç |
+| `custom` | kendi uçun | `--base-url` + `--model` ile her OpenAI-uyumlu servis |
+
+> `chat.py`'de sohbette `/tools` yazarsan 40 aracı listeler, `/exit` ile çıkarsın. Güvenlik aynı: AI yüksek riskli kodu `gh_code_analyze`'den geçirmeden çalıştıramaz.
+
 ---
 
 ## Adım 5 — Canlı köprüyü kur (dünya/envanter verisi için)
@@ -255,7 +291,7 @@ Kurulumdan sonra özel bir şey yapmana gerek yok; **normal konuş**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.2.0 — mr_berk edition
+GENTAHAX MCP v1.3.0 — mr_berk edition
 Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
 ```
 

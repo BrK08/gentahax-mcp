@@ -5,7 +5,7 @@
 > Windows paths are shown by default; Android differences are marked separately.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.2.0 · 40 tools · 6832 real item IDs
+👑 <b>mr_berk</b> edition — v1.3.0 · 40 tools · 6832 real item IDs
 </div>
 
 ---
@@ -163,6 +163,42 @@ The MCP server runs **on your PC** and reaches the phone over **USB (adb)**:
 
 > Claude Desktop stays open **on the PC**; while the phone is connected over USB, the AI can access your game live.
 
+### 🤖 Step 4B — No Claude Desktop? Use ANY AI you want
+
+Don't want a config file? **`chat.py`** connects ChatGPT, Gemini, GLM, DeepSeek, Qwen, Mistral, OpenRouter — even **keyless free local AI (Ollama/LM Studio)**:
+
+```bat
+cd C:\gentahax-mcp
+
+:: 1) Test the MCP side first (NO KEY NEEDED — verifies your setup):
+python chat.py --check
+
+:: 2) List supported AIs:
+python chat.py --list-ai
+
+:: 3) Connect your AI (examples):
+python chat.py --provider deepseek --api-key sk-... --ask "what's the ID of dirt?"
+python chat.py --provider gemini   --api-key AIza...              :: interactive chat
+python chat.py --provider ollama   --model llama3.1               :: FREE, local, no key
+
+:: 4) Or persist settings (skip --api-key every time):
+set GENTAHAX_AI_PROVIDER=deepseek
+set DEEPSEEK_API_KEY=sk-...
+python chat.py --ask "how many dirt blocks are in my world?"
+```
+
+| Provider | Key from | Note |
+|---|---|---|
+| `deepseek` | platform.deepseek.com | one of the cheapest |
+| `gemini` | aistudio.google.com | **free** key |
+| `glm` | bigmodel.cn | glm-4-flash free tier |
+| `openrouter` | openrouter.ai | 300+ models, one key |
+| `ollama` | **NO KEY** | ollama.com → `ollama pull llama3.1` — fully local |
+| `lmstudio` | **NO KEY** | lmstudio.ai → Developer → start server |
+| `custom` | your endpoint | any OpenAI-compatible service via `--base-url` + `--model` |
+
+> In the `chat.py` chat, `/tools` lists the 40 tools, `/exit` quits. Same safety: the AI cannot run high-risk code without passing `gh_code_analyze` first.
+
 ---
 
 ## Step 5 — Set up the live bridge (for world/inventory data)
@@ -257,7 +293,7 @@ After setup, you don't need to do anything special — **just talk**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.2.0 — mr_berk edition
+GENTAHAX MCP v1.3.0 — mr_berk edition
 Trained on real data · Ban-risk warning system · 40 tools · 6832 real item IDs
 ```
 
