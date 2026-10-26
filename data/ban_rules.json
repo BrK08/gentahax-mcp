@@ -1,0 +1,177 @@
+{
+  "version": "1.0",
+  "engine": "mr_berk GENTAHAX MCP Ban-Risk Classifier",
+  "levels": {
+    "high": "YUKSEK — bu kod blogu calistirilirsa ban riski YUKSEKTIR. Calistirmadan once kullaniciya 'BUNDA BAN RISKI VAR' seklinde acikca uyarmak ZORUNLU.",
+    "medium": "ORTA — belirli kosullarda (uzun sureli kullanim, tekrar, kalabalik dunya) risk olusur. Kullaniciya kisaca bilgi verin.",
+    "low": "DUSUK — istemci tarafli / sadece okuma islemleri. Standart uyari yeterli."
+  },
+  "rules": [
+    {
+      "id": "infinite_loop_no_sleep",
+      "pattern": "while\\s+(true|1)",
+      "negatives": ["sleep"],
+      "level": "high",
+      "title": "Sleep'siz sonsuz dongu",
+      "reason": "while true dongusu icinde sleep() yok. Paket gondermese bile dongu islemciyi bogup istemciyi dondurur; paket gonderiyorsa saniyede yuzlerce paket = sunucu tarafinda aninda algilanir (auto-ban).",
+      "advice": "Dongu icine sleep(300) veya daha fazla ekleyin. Auto-farm donguleri icin 250-1000ms ideal araliktir."
+    },
+    {
+      "id": "packet_loop",
+      "pattern": "(sendPacket|sendPacketRaw|sendVariant)\\s*\\(",
+      "context": "loop",
+      "loop_patterns": ["while", "for\\s+.+\\s+do", "repeat"],
+      "level": "high",
+      "title": "Dongu icinde paket gonderme",
+      "reason": "sendPacket/sendPacketRaw/sendVariant bir dongu icinde cagriliyor. Delaysiz paket spam'i sunucunun rate-limit ve bot algilama sistemine takilir; sonuc genelde once kick, tekrarinda dunya/IP ban.",
+      "advice": "Her paket gonderiminden sonra sleep(250+) birakin; mumsal (batch) islemlerde araligi 500ms+ yapin."
+    },
+    {
+      "id": "enter_game_spam",
+      "pattern": "action\\|enter_game",
+      "level": "high",
+      "title": "Login paketi manipulasyonu",
+      "reason": "action|enter_game paketi gonderiliyor. Login isteklerinin tekrari = hesap guvenlik sistemi tarafindan 'brute-force/istismar' olarak isaretlenir; KALICI HESAP BANI ile sonuclanabilir.",
+      "advice": "Login paketlerini asla otomatiklestirmayin; yalnizca oyun kendi gonderirken gozlemleyin."
+    },
+    {
+      "id": "world_rejoin_spam",
+      "pattern": "join_request",
+      "level": "high",
+      "title": "Dunya giris istegi (tekrar riski)",
+      "reason": "action|join_request paketi kodda mevcut. Hizli giris-cikis donguleri (world loop) sunucuda 'world ban' tetikler ve populer dunyalarda IP bazli engelleme yapilir.",
+      "advice": "Dunya degistirme dongulerinde en az 2-4 saniye bekleyin; ayni dunyaya tekrar giriste 10s+ birakin."
+    },
+    {
+      "id": "hwid_spoof",
+      "pattern": "(randomGid|randomMac|setGid|setMac)\\s*\\(",
+      "level": "high",
+      "title": "HWID (MAC/GID) degistirme",
+      "reason": "Cihaz kimligi (MAC/GID) degistiriliyor. Ban evasion amaciyla kullanildiginda Ubisoft guvenlik sistemi tarafindan iliskilendirilir; yeni hesaplar da aninda flag'lenir. En hizli kalici ban sebeplerinden biridir.",
+      "advice": "Bu fonksiyonlari ban kacinma icin KULLANMAYIN. Sadece arastirma amaciyla okuma (getMac/getGid) yapin."
+    },
+    {
+      "id": "enet_redirect",
+      "pattern": "OnENetInit",
+      "negatives": ["log", "Log", "print"],
+      "level": "high",
+      "title": "ENet baglanti hook'u",
+      "reason": "OnENetInit hook'u baglanti IP/port'unu degistirebilir (server redirect). MITM/yönlendirme algilandiginda hesap guvenlik kilidi acilir.",
+      "advice": "OnENetInit'i sadece izleme (log) icin kullanin; ip/port parametrelerini degistirmeyin."
+    },
+    {
+      "id": "tile_spam",
+      "pattern": "requestTileChange",
+      "context": "loop",
+      "loop_patterns": ["while", "for\\s+.+\\s+do", "repeat"],
+      "level": "high",
+      "title": "Dongu icinde blok islemi",
+      "reason": "requestTileChange dongu icinde. Hizli blok koyma/kirma 'block spam' olarak algilanir; buyuk alan doldurma islemlerinde sunucu aninda rollback + dunya ban uygular.",
+      "advice": "Blok islemleri arasina 300ms+ delay koyun; buyuk projelerde (anit, yazı) 500ms onerilir."
+    },
+    {
+      "id": "drop_mass",
+      "pattern": "action\\|drop",
+      "level": "medium",
+      "title": "Esya atma paketi",
+      "reason": "action|drop paketi var. Tek seferde guvenli, ancak dongu ile toplu atma 'drop party bot' olarak algilanabilir; trade-oncesi toplu drop bazi sunucu kurallarini ihlal eder.",
+      "advice": "Toplu drop'ta her atma arasi 400ms+ birakin."
+    },
+    {
+      "id": "mod_fly_movement",
+      "pattern": "(patchMemoryByName\\s*\\(\\s*['\"]Mod Fly|toggleCheat\\s*\\(\\s*26)",
+      "level": "medium",
+      "title": "Mod Fly / hareket anomalisi",
+      "reason": "Mod Fly (ucus) aciliyor. Sunucu hareket dogrulamasi yerlesik olmayan koordinat degisimlerini loglar; uzun kullanimda 'movement hack' raporu olusur.",
+      "advice": "Mod Fly'i kisitli surede kullanin, insan-olmayan mesafelerde (bomba gibi) atlamayin; kalabalik dunyalarda kapali tutun."
+    },
+    {
+      "id": "noclip_cheat",
+      "pattern": "(patchMemoryByName\\s*\\(\\s*['\"]No Clip|toggleCheat\\s*\\(\\s*6)",
+      "level": "medium",
+      "title": "No Clip",
+      "reason": "No Clip (duvardan gecis) sunucu tarafinda imkansiz konum raporlarina yol acar.",
+      "advice": "Kisa sureli kullanin; baska oyuncularin gordugu dunyalarda kullanmamak ciddi olcude riski azaltir."
+    },
+    {
+      "id": "auto_fishing",
+      "pattern": "(Auto Fishing|OnFishStrike)",
+      "level": "medium",
+      "title": "Otomatik balikcilik",
+      "reason": "Auto Fishing sistemleri periyodik paket paterni uretir; Ubisoft belirli donemlerde toplu balikcilik botu dalgalari yasaklar (ban wave).",
+      "advice": "Insan araliklari ekleyin (rastgele 1-4s), gunde saatlerce kesintisiz calistirmayin."
+    },
+    {
+      "id": "auto_collect",
+      "pattern": "(requestCollect|AutoCollect|auto.?collect)",
+      "context": "loop",
+      "loop_patterns": ["while", "for\\s+.+\\s+do"],
+      "level": "medium",
+      "title": "Otomatik toplama",
+      "reason": "Auto-collect dongusu bot paterni olusturur; ayni dunyada uzun sure calisan toplama botlari raporlanir.",
+      "advice": "Toplama araliklarina rastgelelik ekleyin (math.random ile 200-600ms), insan benzeri hareket koruyun."
+    },
+    {
+      "id": "fast_move_path",
+      "pattern": "findPath\\s*\\(",
+      "context": "loop",
+      "loop_patterns": ["while", "for\\s+.+\\s+do"],
+      "level": "medium",
+      "title": "Dongu icinde path finding",
+      "reason": "findPath dongu icinde sik cagriliyor; kesintisiz yurume + aninda donusler hareket anomalisidir.",
+      "advice": "Hedefler arasi 300-800ms bekleyin."
+    },
+    {
+      "id": "dialog_automation",
+      "pattern": "action\\|dialog_return",
+      "level": "medium",
+      "title": "Dialog otomasyonu",
+      "reason": "Sunucu diyaloglarina otomatik yanit (dialog_return) bazi sistemlerde (banka, vending) tuhaf islem hizlari olarak gorunur.",
+      "advice": "Dialog yanitlarina 500ms+ gecikme ekleyin."
+    },
+    {
+      "id": "esp_visual",
+      "pattern": "(worldToScreen|GetBackgroundDrawList|AddRect|AddLine|AddText)",
+      "level": "low",
+      "title": "Gorsel katman (ESP)",
+      "reason": "Sadece istemci tarafli cizim; sunucuya paket gitmez. Tespit riski cok dusuk.",
+      "advice": "Ekran goruntulerini baskalariyla paylasirken isiminizi/Spawn bilginizi sansurleyin."
+    },
+    {
+      "id": "read_only",
+      "pattern": "(getTile|getWorld|getInventory|getWorldObject|getItemByID|getItemByName|getLocal|getPlayerlist)",
+      "level": "low",
+      "title": "Sadece okuma",
+      "reason": "Veri okuma fonksiyonlari sunucuya hicbir paket gondermez. Ban riski yok denecek kadar az.",
+      "advice": "Serbestce kullanilabilir."
+    },
+    {
+      "id": "imgui_ui",
+      "pattern": "ImGui\\.",
+      "level": "low",
+      "title": "ImGui arayuzu",
+      "reason": "Arayuz cizimi tamamen istemci taraflidir.",
+      "advice": "Serbestce kullanilabilir."
+    },
+    {
+      "id": "webhook_exfil",
+      "pattern": "(sendWebhook|makeRequest)",
+      "level": "low",
+      "title": "Dis ag istegi",
+      "reason": "Oyun acisindan risk yok (sunucuya paket gitmez) ancak kisisel veri paylasimina dikkat: kendi verinizden baskasinin verisini (oyuncu listesi vb.) webhook'a gondermek KVKK/gizlilik acisindan sorunlu olabilir.",
+      "advice": "Yalnizca kendi verilerinizi gonderin."
+    },
+    {
+      "id": "thread_usage",
+      "pattern": "runThread",
+      "level": "low",
+      "title": "Thread kullanimi",
+      "reason": "Thread kullanimi tek basina risk degil; ancak thread icindeki paket donguleri yine spam riski tasir.",
+      "advice": "Thread icinde de sleep kurallarina uyulmali."
+    }
+  ],
+  "general_warnings": {
+    "tr": "GENTAHAX Growtopia Kullanim Kosullarini ihlal eder; tum mod menuler gibi algilanma riski tasir. En guvenli kullanim: gorsel/okuma aracları (ESP, dunya bilgisi), kisa sureli otomasyonlar ve kalabalik olmayan dunyalar. Hesabinda degerli esya varsa mod menuden uzak dur.",
+    "high_risk_banner": "⚠️ UYARI: BUNDA BAN RISKİ VAR! Bu kod yuksek riskli islemler iceriyor. Calistirmadan once iki kez dusunun — hesabiniz kalici olarak banlanabilir."
+  }
+}

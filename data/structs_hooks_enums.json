@@ -1,0 +1,259 @@
+{
+  "source": "OFFICIAL GENTA-HAX-DOCS + GENTAHAX v5.61 GTInternal.dll binary verification",
+  "hooks": {
+    "android": [
+      {
+        "name": "OnTextPacket",
+        "params": "int flag, String packet",
+        "description": "Sunucudan gelen text paketlerinde tetiklenir. packet ornek: 'action|log\\nmsg|Hoş geldin'. Sohbet, konsol mesajlari, sistem mesajlari buradan gecer.",
+        "example": "AddHook('OnTextPacket', 'txt', function(flag, pkt) logToConsole('[TXT] ' .. pkt) end)"
+      },
+      {
+        "name": "OnVarlist",
+        "params": "Variantlist_t[] vars, int netID",
+        "description": "Sunucudan gelen TUM variant list paketlerinde tetiklenir. Gercek zamanli oyun olaylarini (OnConsoleMessage, OnTalkBubble, OnSpawn, OnSetPos...) yakalamak icin ana hook budur. vars[0] = fonksiyon adi, kalan hucreler degerler.",
+        "example": "AddHook('OnVarlist', 'vl', function(vars, netid) if vars[0] == 'OnConsoleMessage' then logToConsole('[KONSOL] ' .. tostring(vars[1])) end end)"
+      },
+      {
+        "name": "OnTouch",
+        "params": "float x, float y",
+        "description": "Ekrana dokunuldugunda tetiklenir (dunya koordinati).",
+        "example": "AddHook('OnTouch', 'touch', function(x, y) logToConsole('Dokunma: ' .. x .. ',' .. y) end)"
+      },
+      {
+        "name": "OnRender",
+        "params": "int deltaTime",
+        "description": "Her karede tetiklenir. ImGui UI cizimi ESP overlay icin burada yapilir. DLL icinde 'Application Rendering' olarak gecer.",
+        "example": "AddHook('OnRender', 'ui', function(dt) ImGui.Begin('Pencerem'); ImGui.Text('dt: ' .. dt); ImGui.End() end)"
+      },
+      {
+        "name": "OnRawPacket",
+        "params": "TankPacketStruct raw",
+        "description": "Ham (raw) paketlerde tetiklenir. DLL icinde 'Raw Packet' olarak gecer.",
+        "example": "AddHook('OnRawPacket', 'raw', function(raw) logToConsole('raw type=' .. raw.type) end)"
+      },
+      {
+        "name": "OnGameUpdatePacket",
+        "params": "TankPacketStruct raw",
+        "description": "Oyun guncelleme paketlerinde tetiklenir (hareket, punch, tile degisikligi). DLL icinde 'Game Update Packet' olarak gecer.",
+        "example": "AddHook('OnGameUpdatePacket', 'gup', function(raw) if raw.type == 3 then logToConsole('Tile degisti') end end)"
+      },
+      {
+        "name": "OnENetInit",
+        "params": "String ip, int port",
+        "description": "ENet ag baglantisi kurulurken tetiklenir. Giris/control sunucusu yonlendirmesi burada gorulur. DIKKAT: ip/port degistirmek sunucu yakalamasina (MITM algilama) yol acabilir.",
+        "example": "AddHook('OnENetInit', 'enet', function(ip, port) logToConsole('Baglaniyor: ' .. ip .. ':' .. port) end)"
+      }
+    ],
+    "windows": [
+      {
+        "name": "OnPacket",
+        "params": "int flag, String packet",
+        "description": "Text paketlerinde tetiklenir (Windows).",
+        "example": "AddHook('OnPacket', 'p', function(flag, pkt) Log(pkt) end)"
+      },
+      {
+        "name": "OnVarlist",
+        "params": "Variantlist_t[] vars, int netID",
+        "description": "Variant list paketlerinde tetiklenir (Windows). Android ile ayni kullanim.",
+        "example": "AddHook('OnVarlist', 'vl', function(vars, netid) Log(vars[0]) end)"
+      },
+      {
+        "name": "OnProcessRaw",
+        "params": "TankPacketStruct raw",
+        "description": "Raw paket islenirken tetiklenir (Windows).",
+        "example": "AddHook('OnProcessRaw', 'r', function(raw) Log(raw.type) end)"
+      }
+    ]
+  },
+  "structs": {
+    "TankPacketStruct": {
+      "android": [
+        {"name": "type", "type": "uint8_t", "desc": "Paket tipi (PACKET_STATE=0, PACKET_CALL_FUNCTION=1, PACKET_TILE_CHANGE_REQUEST=3 ...)"},
+        {"name": "padding1", "type": "uint8_t", "desc": "Dolgu bayti"},
+        {"name": "padding2", "type": "uint8_t", "desc": "Dolgu bayti"},
+        {"name": "padding3", "type": "uint8_t", "desc": "Dolgu bayti"},
+        {"name": "netid", "type": "int", "desc": "Paketin ait oldugu oyuncu netID'si"},
+        {"name": "secid", "type": "int", "desc": "Ikincil ID"},
+        {"name": "state", "type": "int", "desc": "Durum bayragi (16=tile change, 32=punch...)"},
+        {"name": "padding4", "type": "float", "desc": "Dolgu"},
+        {"name": "value", "type": "int", "desc": "Deger (tile change icin itemID, damage miktari vb.)"},
+        {"name": "x", "type": "float", "desc": "X koordinati"},
+        {"name": "y", "type": "float", "desc": "Y koordinati"},
+        {"name": "speedx", "type": "float", "desc": "X hizi"},
+        {"name": "speedy", "type": "float", "desc": "Y hizi"},
+        {"name": "padding5", "type": "int", "desc": "Dolgu"},
+        {"name": "punchx", "type": "int", "desc": "Punch/hedef tile X"},
+        {"name": "punchy", "type": "int", "desc": "Punch/hedef tile Y"}
+      ],
+      "windows": [
+        {"name": "type", "type": "uint8_t"},
+        {"name": "state", "type": "int"},
+        {"name": "value", "type": "int"},
+        {"name": "posX", "type": "float"},
+        {"name": "posY", "type": "float"},
+        {"name": "xspeed", "type": "float"},
+        {"name": "yspeed", "type": "float"},
+        {"name": "px", "type": "int"},
+        {"name": "py", "type": "int"}
+      ]
+    },
+    "NetAvatar": {
+      "android": [
+        {"name": "pos", "type": "Vector2i", "desc": "Pozisyon"},
+        {"name": "name", "type": "string", "desc": "Oyuncu adi (GrowID)"},
+        {"name": "country", "type": "string", "desc": "Ulke (TR, US...)"},
+        {"name": "userId", "type": "int", "desc": "Kullanici ID"},
+        {"name": "status", "type": "int", "desc": "Durum"},
+        {"name": "netId", "type": "int", "desc": "Ag ID (dunyaya ozel)"},
+        {"name": "facing", "type": "bool", "desc": "Yon (sag/sol)"},
+        {"name": "hair", "type": "uint32_t", "desc": "Sac ID"},
+        {"name": "shirt", "type": "uint32_t", "desc": "Gomlek ID"},
+        {"name": "pants", "type": "uint32_t", "desc": "Pantolon ID"},
+        {"name": "feet", "type": "uint32_t", "desc": "Ayakkabi ID"},
+        {"name": "face", "type": "uint32_t", "desc": "Yuz aksesuar ID"},
+        {"name": "hand", "type": "uint32_t", "desc": "El aksesuar ID"},
+        {"name": "back", "type": "uint32_t", "desc": "Sirt aksesuar ID"},
+        {"name": "mask", "type": "uint32_t", "desc": "Maske ID"},
+        {"name": "necklace", "type": "uint32_t", "desc": "Kolye ID"},
+        {"name": "ping", "type": "int", "desc": "Gecikme ms"},
+        {"name": "punchId", "type": "uint8_t", "desc": "Son punch ID"},
+        {"name": "gemsCollected", "type": "int", "desc": "Toplanan gems"},
+        {"name": "gems", "type": "int", "desc": "Mevcut gems"},
+        {"name": "skinColor", "type": "Vector4i", "desc": "Ten rengi"},
+        {"name": "quickSlot", "type": "Vector4i", "desc": "Hizli slotlar"},
+        {"name": "backpackSlot", "type": "int", "desc": "Sirt cantasi slotu"},
+        {"name": "selectedItem", "type": "uint32_t", "desc": "Secili esya ID"}
+      ],
+      "windows": [
+        {"name": "name", "type": "string"}, {"name": "status", "type": "boolean"}, {"name": "ances", "type": "number"},
+        {"name": "netid", "type": "number"}, {"name": "necklace", "type": "number"}, {"name": "ping", "type": "number"},
+        {"name": "skin", "type": "number"}, {"name": "day", "type": "number"}, {"name": "mask", "type": "number"},
+        {"name": "face", "type": "number"}, {"name": "accountsecured", "type": "boolean"}, {"name": "back", "type": "number"},
+        {"name": "pants", "type": "number"}, {"name": "role_day", "type": "string"}, {"name": "captcha", "type": "string"},
+        {"name": "level", "type": "number"}, {"name": "feet", "type": "number"}, {"name": "shirt", "type": "number"},
+        {"name": "haveaccount", "type": "boolean"}, {"name": "month", "type": "number"}, {"name": "awesomeness", "type": "number"},
+        {"name": "hair", "type": "number"}, {"name": "hand", "type": "number"}, {"name": "botid", "type": "number"},
+        {"name": "gems", "type": "number"}, {"name": "posY", "type": "number"}, {"name": "posX", "type": "number"},
+        {"name": "tournament", "type": "boolean"}
+      ]
+    },
+    "Tile": {
+      "android": [
+        {"name": "pos", "type": "Vector2i"}, {"name": "fg", "type": "uint16_t", "desc": "On plan blok itemID (0=bos)"},
+        {"name": "bg", "type": "uint16_t", "desc": "Arka plan blok itemID (0=bos)"},
+        {"name": "isCollideable", "type": "bool"}, {"name": "collisionType", "type": "int"},
+        {"name": "flags", "type": "int"}, {"name": "getFlags", "type": "TileFlag"}
+      ],
+      "windows": [
+        {"name": "fg", "type": "uint16_t"}, {"name": "bg", "type": "uint16_t"},
+        {"name": "ready", "type": "bool"}, {"name": "x", "type": "int"}, {"name": "y", "type": "int"}
+      ]
+    },
+    "TileFlag": {
+      "fields": ["tileExtra", "locked", "wasSpliced", "willSpawnSeedToo", "seed", "flipped", "enabled", "public", "silenced", "water", "glue", "burn", "painted"]
+    },
+    "TileExtra": {
+      "fields": [
+        {"name": "valid", "type": "bool"}, {"name": "type", "type": "int"}, {"name": "growth", "type": "int", "desc": "Agac buyume durumu (600 = hasat hazir)"},
+        {"name": "owner", "type": "int", "desc": "Tile sahibinin userID'i"}, {"name": "flags", "type": "int"},
+        {"name": "adminList", "type": "list<uint32_t>", "desc": "Kilit yetkili listesi"}, {"name": "ready", "type": "bool", "desc": "Hasata hazir mi"},
+        {"name": "label", "type": "string", "desc": "Kapi/isaret yazisi"}, {"name": "padding1", "type": "string"},
+        {"name": "volume", "type": "int", "desc": "Note block ses seviyesi"}, {"name": "fruitCount", "type": "int", "desc": "Meyve sayisi"},
+        {"name": "lastUpdate", "type": "int"}
+      ]
+    },
+    "World": {
+      "android": [
+        {"name": "name", "type": "string"}, {"name": "width", "type": "int"},
+        {"name": "height", "type": "int"}, {"name": "lastOid", "type": "int", "desc": "Son dunya nesne ID sayaci"}
+      ],
+      "windows": [
+        {"name": "name", "type": "String"}, {"name": "width", "type": "uint8_t"},
+        {"name": "height", "type": "uint8_t"}, {"name": "tilecount", "type": "int"}
+      ]
+    },
+    "WorldObject": {
+      "android": [
+        {"name": "id", "type": "int", "desc": "Esya ID"}, {"name": "amount", "type": "int", "desc": "Miktar"},
+        {"name": "oid", "type": "int", "desc": "Nesne sirasi"}, {"name": "flags", "type": "int"}, {"name": "pos", "type": "Vector2i"}
+      ],
+      "windows": [
+        {"name": "id", "type": "int"}, {"name": "amount", "type": "int"}, {"name": "oid", "type": "int"},
+        {"name": "invbits", "type": "int"}, {"name": "x", "type": "int"}, {"name": "y", "type": "int"}
+      ]
+    },
+    "NPCList": {
+      "android": [
+        {"name": "id", "type": "int"}, {"name": "type", "type": "int"},
+        {"name": "current", "type": "Vector2i"}, {"name": "target", "type": "Vector2i"}
+      ],
+      "windows": [
+        {"name": "id", "type": "int"}, {"name": "type", "type": "int"},
+        {"name": "c_pos_x", "type": "int"}, {"name": "c_pos_y", "type": "int"},
+        {"name": "t_pos_x", "type": "int"}, {"name": "t_pos_y", "type": "int"}
+      ]
+    },
+    "Inventory": {
+      "fields": [{"name": "id", "type": "int", "desc": "Esya ID"}, {"name": "amount", "type": "uint8_t", "desc": "Miktar (0=200 adet)"}]
+    },
+    "ItemInfo": {
+      "android": [
+        {"name": "name", "type": "string"}, {"name": "flags", "type": "int"}, {"name": "rarity", "type": "int", "desc": "Nadirlik (999=eşsiz)"},
+        {"name": "growth", "type": "int"}, {"name": "texture", "type": "string"}, {"name": "texture_2", "type": "string"},
+        {"name": "collisionType", "type": "int"}, {"name": "texturePos", "type": "Vector2i"}, {"name": "clothType", "type": "int"},
+        {"name": "blockType", "type": "int"}, {"name": "hitSoundType", "type": "int"}
+      ],
+      "windows": [
+        {"name": "Name", "type": "string"}, {"name": "ItemType", "type": "int"}, {"name": "Rarity", "type": "int"},
+        {"name": "Growth", "type": "int"}, {"name": "Collision", "type": "int"}
+      ]
+    },
+    "Camera": {
+      "fields": [{"name": "scale", "type": "float"}, {"name": "pos", "type": "Vector2f"}, {"name": "center", "type": "Vector2f"}]
+    },
+    "Response": {
+      "fields": [{"name": "content", "type": "String", "desc": "HTTP yanit govdesi (makeRequest donusu)"}]
+    },
+    "Vector2i_f": {"fields": ["x", "y"], "desc": "int veya float tipli 2B vektor"},
+    "Vector3i_f": {"fields": ["x", "y", "z"]},
+    "Vector4i_f": {"fields": ["w", "x", "y", "z"]}
+  },
+  "enums": {
+    "CheatCode": {
+      "0": "Fast Fruit", "1": "Ghost Mode", "2": "Night Vision", "3": "Can See Ghost", "4": "Anti Bounce",
+      "5": "Death Anywhere", "6": "No Clip", "7": "Bypass Death", "8": "Show Door Label", "9": "Show Sign Label",
+      "10": "Anti Portal", "11": "Dev Mode", "12": "Fast Wheel", "13": "Real Fake Bubble", "14": "Show Debug",
+      "15": "Anti State", "16": "No Particle", "17": "Path Finder", "18": "Skip Update", "19": "Anti Tile Activation",
+      "20": "Anti Respawn", "21": "Anti Freeze State", "22": "Can't Take Item", "23": "Can't move", "24": "Fast Dice",
+      "25": "Auto Acc", "26": "Mod Fly", "27": "Extractor Dynamo", "28": "Anti OnKilled", "29": "No Render Image",
+      "30": "Free Camera", "31": "Show Ready Harvest"
+    },
+    "ToastType": {
+      "0": "ImGuiToastType_None", "1": "ImGuiToastType_Success", "2": "ImGuiToastType_Warning",
+      "3": "ImGuiToastType_Error", "4": "ImGuiToastType_Info"
+    },
+    "ENetPacketFlag": {
+      "0": "ENET_PACKET_FLAG_RELIABLE", "1": "ENET_PACKET_FLAG_UNSEQUENCED", "2": "ENET_PACKET_FLAG_NO_ALLOCATE",
+      "3": "ENET_PACKET_FLAG_UNRELIABLE_FRAGMENT", "8": "ENET_PACKET_FLAG_SENT"
+    },
+    "PacketType": {
+      "0": "PACKET_STATE", "1": "PACKET_CALL_FUNCTION", "2": "PACKET_UPDATE_STATUS", "3": "PACKET_TILE_CHANGE_REQUEST",
+      "4": "PACKET_SEND_MAP_DATA", "5": "PACKET_SEND_TILE_UPDATE_DATA", "6": "PACKET_SEND_TILE_UPDATE_DATA_MULTIPLE",
+      "7": "PACKET_TILE_ACTIVATE_REQUEST", "8": "PACKET_TILE_APPLY_DAMAGE", "9": "PACKET_SEND_INVENTORY_STATE",
+      "10": "PACKET_ITEM_ACTIVATE_REQUEST", "11": "PACKET_ITEM_ACTIVATE_OBJECT_REQUEST", "12": "PACKET_SEND_TILE_TREE_STATE",
+      "13": "PACKET_MODIFY_ITEM_INVENTORY", "14": "PACKET_ITEM_CHANGE_OBJECT", "15": "PACKET_SEND_LOCK",
+      "16": "PACKET_SEND_ITEM_DATABASE_DATA", "17": "PACKET_SEND_PARTICLE_EFFECT", "18": "PACKET_SET_ICON_STATE",
+      "19": "PACKET_ITEM_EFFECT", "20": "PACKET_SET_CHARACTER_STATE", "21": "PACKET_PING_REPLY", "22": "PACKET_PING_REQUEST",
+      "23": "PACKET_GOT_PUNCHED", "24": "PACKET_APP_CHECK_RESPONSE", "25": "PACKET_APP_INTEGRITY_FAIL",
+      "26": "PACKET_DISCONNECT", "27": "PACKET_BATTLE_JOIN", "28": "PACKET_BATTLE_EVEN", "29": "PACKET_USE_DOOR",
+      "30": "PACKET_SEND_PARENTAL", "31": "PACKET_GONE_FISHIN", "32": "PACKET_STEAM", "33": "PACKET_PET_BATTLE",
+      "34": "PACKET_NPC", "35": "PACKET_SPECIAL", "36": "PACKET_SEND_PARTICLE_EFFECT_V2",
+      "37": "GAME_ACTIVE_ARROW_TO_ITEM", "38": "GAME_SELECT_TILE_INDEX"
+    },
+    "MemoryPatchNames": {
+      "desc": "patchMemoryByName / restoreMemoryByName icin DLL v5.61 icinde dogrulanan isimler (case-insensitive)",
+      "names": ["Mod Fly", "Ghost Mode", "Night Vision", "Can See Ghost", "Anti portal", "Anti Checkpoint", "Anti Respawn", "Anti Take Item", "Dev Mode", "Fast Fruits", "Path Finder", "Skip Update", "Skip Update v2", "No Block", "No Clip", "Ghost Ship", "Anti Gravity", "Auto Fishing", "Auto Stop"]
+    }
+  }
+}

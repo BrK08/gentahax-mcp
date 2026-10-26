@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+bridge_in.txt
+bridge_out.txt
+lua_logs.txt
+.DS_Store

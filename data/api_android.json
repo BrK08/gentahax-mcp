@@ -1,0 +1,492 @@
+{
+  "source": "OFFICIAL GENTA-HAX-DOCS (github.com/GENTA7740/GENTA-HAX-DOCS) + GENTAHAX v5.61 GTInternal.dll binary verification",
+  "engine": "Lua 5.4.6",
+  "script_path": "Android/media/GENTAHAX/Script/here.lua",
+  "verified_against": "GENTAHAX v5.61 Windows (GTInternal.dll, MD5 8f95ed4449dc4893f51d5380e31f8055)",
+  "functions": [
+    {
+      "name": "getLocal",
+      "signature": "NetAvatar* getLocal()",
+      "category": "player",
+      "returns": "NetAvatar*",
+      "description": "Yerel (kendi) oyuncunun NetAvatar nesnesini dondurur. Isim, pozisyon, gems, kuafor kiyafet ID'leri gibi tum bilgiler bu nesnede.",
+      "example": "local me = getLocal(); logToConsole('Hosgeldin ' .. me.name .. ' | Gems: ' .. me.gems)",
+      "risk": "low"
+    },
+    {
+      "name": "getPlayerByNetID",
+      "signature": "NetAvatar* getPlayerByNetID(int netid)",
+      "category": "player",
+      "returns": "NetAvatar*",
+      "description": "Verilen netID'ye sahip oyuncuyu dondurur. Dunyadaki baska oyuncularin bilgisini almak icin kullanilir.",
+      "example": "local p = getPlayerByNetID(-1)",
+      "risk": "low"
+    },
+    {
+      "name": "getPlayerlist",
+      "signature": "std::list<NetAvatar*> getPlayerlist()",
+      "category": "player",
+      "returns": "NetAvatar listesi",
+      "description": "Dunyadaki tum oyuncularin NetAvatar listesini dondurur. ESP, oyuncu listesi, topluluk analizi icin kullanilir.",
+      "example": "for _, p in pairs(getPlayerlist()) do logToConsole(p.name .. ' @ ' .. p.pos.x .. ',' .. p.pos.y) end",
+      "risk": "low"
+    },
+    {
+      "name": "getInventory",
+      "signature": "std::list<Inventory*> getInventory()",
+      "category": "inventory",
+      "returns": "Inventory listesi (id, amount)",
+      "description": "Oyuncunun envanterindeki tum esyalari {id, amount} olarak dondurur.",
+      "example": "for _, item in pairs(getInventory()) do logToConsole('Item ' .. item.id .. ' x' .. item.amount) end",
+      "risk": "low"
+    },
+    {
+      "name": "getWorld",
+      "signature": "World* getWorld()",
+      "category": "world",
+      "returns": "World* (name, width, height, lastOid)",
+      "description": "Bulunulan dunyanin bilgilerini dondurur.",
+      "example": "local w = getWorld(); logToConsole('Dunya: ' .. w.name .. ' (' .. w.width .. 'x' .. w.height .. ')')",
+      "risk": "low"
+    },
+    {
+      "name": "checkTile",
+      "signature": "Tile* checkTile(int x, int y)",
+      "category": "world",
+      "returns": "Tile*",
+      "description": "Verilen koordinattaki tile'i dondurur (fg, bg, flags, collision). Dunya disina tasarsa nil doner.",
+      "example": "local t = checkTile(25, 54); if t then logToConsole('FG: ' .. t.fg .. ' BG: ' .. t.bg) end",
+      "risk": "low"
+    },
+    {
+      "name": "getTile",
+      "signature": "std::vector<Tile*> getTile()",
+      "category": "world",
+      "returns": "Tile vektoru",
+      "description": "Dunyadaki tum tile'lari dondurur. Buyuk dunyalarde cok veri icerir.",
+      "example": "local tiles = getTile(); logToConsole('Toplam tile: ' .. #tiles)",
+      "risk": "low"
+    },
+    {
+      "name": "getExtraTile",
+      "signature": "TileExtra* getExtraTile(int x, int y)",
+      "category": "world",
+      "returns": "TileExtra* (valid, type, growth, owner, flags, adminList, ready, label, fruitCount...)",
+      "description": "Tile'in ekstra bilgilerini dondurur: kilit sahibi, agac buyumesi, ready (hasat) durumu, label, admin listesi.",
+      "example": "local te = getExtraTile(10, 10); if te and te.ready then logToConsole('Hasata hazir!') end",
+      "risk": "low"
+    },
+    {
+      "name": "setTile",
+      "signature": "void setTile(Tile*)",
+      "category": "world",
+      "description": "Tile nesnesini degistirir. Dikkat: sadece istemci tarafinda gecerlidir, sunucu tarafini etkilemez.",
+      "example": "local t = checkTile(0, 0); setTile(t)",
+      "risk": "low"
+    },
+    {
+      "name": "getWorldObject",
+      "signature": "std::list<WorldObject*> getWorldObject()",
+      "category": "world",
+      "returns": "WorldObject listesi (id, amount, oid, flags, pos)",
+      "description": "Dunyada yerde duran tum nesneleri (dusen esyalar) dondurur. Auto-collect scriptlerinin temeli.",
+      "example": "for _, obj in pairs(getWorldObject()) do logToConsole('Yerde: ' .. obj.id .. ' x' .. obj.amount) end",
+      "risk": "low"
+    },
+    {
+      "name": "getNpc",
+      "signature": "std::list<NPCList*> getNpc()",
+      "category": "world",
+      "returns": "NPCList listesi (id, type, current, target)",
+      "description": "Dunyadaki NPC'leri dondurur.",
+      "example": "for _, npc in pairs(getNpc()) do logToConsole('NPC ' .. npc.id) end",
+      "risk": "low"
+    },
+    {
+      "name": "getTouchAtScreenPos",
+      "signature": "Vector2f getTouchAtScreenPos()",
+      "category": "touch",
+      "returns": "Vector2f (x, y)",
+      "description": "Ekrandaki dokunma pozisyonunu dondurur (piksel).",
+      "example": "local t = getTouchAtScreenPos()",
+      "risk": "low"
+    },
+    {
+      "name": "getTouchAtWorldPos",
+      "signature": "Vector2f getTouchAtWorldPos()",
+      "category": "touch",
+      "returns": "Vector2f (x, y)",
+      "description": "Dokunmanin dunya koordinatindaki karsiligini dondurur.",
+      "example": "local w = getTouchAtWorldPos()",
+      "risk": "low"
+    },
+    {
+      "name": "getCamera",
+      "signature": "Camera* getCamera()",
+      "category": "camera",
+      "returns": "Camera* (scale, pos, center)",
+      "description": "Kamera nesnesini dondurur.",
+      "example": "local cam = getCamera()",
+      "risk": "low"
+    },
+    {
+      "name": "worldToScreen",
+      "signature": "Vector2f worldToScreen(float x, float y)",
+      "category": "camera",
+      "returns": "Vector2f",
+      "description": "Dunya koordinatini ekran koordinatina cevirir. ESP cizimi icin vazgecilmez.",
+      "example": "local screenPos = worldToScreen(me.pos.x, me.pos.y)",
+      "risk": "low"
+    },
+    {
+      "name": "setCamera",
+      "signature": "void setCamera(float x, float y)",
+      "category": "camera",
+      "description": "Kamerayi verilen dunya koordinatina tasir (Free Camera).",
+      "example": "setCamera(50.0, 30.0)",
+      "risk": "low"
+    },
+    {
+      "name": "getMac",
+      "signature": "String getMac()",
+      "category": "device",
+      "returns": "String",
+      "description": "Cihazin MAC adresini dondurur.",
+      "example": "logToConsole(getMac())",
+      "risk": "low"
+    },
+    {
+      "name": "getGid",
+      "signature": "String getGid()",
+      "category": "device",
+      "returns": "String",
+      "description": "Cihazin Google ID (GID) degerini dondurur.",
+      "example": "logToConsole(getGid())",
+      "risk": "low"
+    },
+    {
+      "name": "randomGid",
+      "signature": "void randomGid()",
+      "category": "device",
+      "description": "GID degerini rastgele degistirir. BAN RISKI: HWID degistirme sunucu tarafinda algilanabilir, ozellikle ban yemek icin kullaniliyorsa kalici ban riski tasir.",
+      "example": "randomGid()",
+      "risk": "high"
+    },
+    {
+      "name": "randomMac",
+      "signature": "void randomMac()",
+      "category": "device",
+      "description": "MAC adresini rastgele degistirir. BAN RISKI: randomGid ile ayni risk seviyesi.",
+      "example": "randomMac()",
+      "risk": "high"
+    },
+    {
+      "name": "setGid",
+      "signature": "void setGid(String newGoogleID) -- max 37 karakter",
+      "category": "device",
+      "description": "GID'i verilen degerle degistirir (max 37 karakter). BAN RISKI: HWID manipulasyonu.",
+      "example": "setGid('01' .. string.rep('a', 35))",
+      "risk": "high"
+    },
+    {
+      "name": "setMac",
+      "signature": "void setMac(String newMac) -- max 18 karakter",
+      "category": "device",
+      "description": "MAC adresini verilen degerle degistirir (max 18 karakter). BAN RISKI: HWID manipulasyonu.",
+      "example": "setMac('AA:BB:CC:DD:EE:FF')",
+      "risk": "high"
+    },
+    {
+      "name": "sendPacket",
+      "signature": "void sendPacket(int type, String pkt)",
+      "category": "packet",
+      "description": "Sunucuya text paketi gonderir. type=2 (text), pkt ornek: 'action|input\\ntext|merhaba'. BAN RISKI: Dongu icinde delaysiz kullanilirsa paket spam algilanir.",
+      "example": "sendPacket(2, 'action|input\\ntext|/go START')",
+      "risk": "medium"
+    },
+    {
+      "name": "sendPacketRaw",
+      "signature": "void sendPacketRaw(bool send_to_client, TankPacketStruct packet)",
+      "category": "packet",
+      "description": "TankPacketStruct ile ham (raw) paket gonderir. send_to_client=true olursa paketi istemciye (kendine) gonderir. BAN RISKI: Hareket/punch paketleri spam yapilirsa algilanir.",
+      "example": "sendPacketRaw(false, {type = 3, state = 16, value = 18, x = 50, y = 30, punchx = 50, punchy = 30})",
+      "risk": "medium"
+    },
+    {
+      "name": "sendVariant",
+      "signature": "void sendVariant(variantlist_t var, int netID, int delay)",
+      "category": "packet",
+      "description": "Variant list paketi gonderir. var = { [0]='fonksiyon_adi', ... } seklinde 7 hucreli dizi. BAN RISKI: Sahte konsol mesaji / taklit paketleri sunucu tarafindan loglanir.",
+      "example": "sendVariant({'OnConsoleMessage', 'Mesaj'}, -1, 0)",
+      "risk": "medium"
+    },
+    {
+      "name": "getCurrentTimeInternal",
+      "signature": "unsigned long getCurrentTimeInternal()",
+      "category": "timing",
+      "returns": "unsigned long (milisaniye)",
+      "description": "Sistem saatini milisaniye cinsinden dondurur. Auto-farm dongulerinde delay hesabi icin kullanilir.",
+      "example": "local now = getCurrentTimeInternal()",
+      "risk": "low"
+    },
+    {
+      "name": "arrowToItem",
+      "signature": "void arrowToItem(bool isFloatingObject, int itemID_Target)",
+      "category": "useful",
+      "description": "Verilen esyaya yonelen ok gosterir.",
+      "example": "arrowToItem(false, 112)",
+      "risk": "low"
+    },
+    {
+      "name": "getDiscordID",
+      "signature": "std::string getDiscordID()",
+      "category": "useful",
+      "returns": "string",
+      "description": "GENTAHAX kullanicisinin Discord ID'sini dondurur.",
+      "example": "logToConsole(getDiscordID())",
+      "risk": "low"
+    },
+    {
+      "name": "checkPath",
+      "signature": "bool checkPath(int x, int y)",
+      "category": "useful",
+      "returns": "bool",
+      "description": "Verilen koordinata yol olup olmadigini kontrol eder.",
+      "example": "if checkPath(25, 30) then logToConsole('Yol var') end",
+      "risk": "low"
+    },
+    {
+      "name": "requestCollect",
+      "signature": "void requestCollect(int x, int y, int itemID)",
+      "category": "action",
+      "description": "Verilen koordinattaki yerdeki esyayi toplama istegi gonderir. BAN RISKI: Hizli dongude kullanilirsa auto-collect bot algilanabilir.",
+      "example": "requestCollect(obj.pos.x, obj.pos.y, obj.id)",
+      "risk": "medium"
+    },
+    {
+      "name": "requestTileChange",
+      "signature": "void requestTileChange(int x, int y, int item_id)",
+      "category": "action",
+      "description": "Verilen koordinata blok koyma/kesme istegi gonderir (PACKET_TILE_CHANGE_REQUEST). BAN RISKI: Spam yapilirsa block spam algilanir.",
+      "example": "requestTileChange(25, 54, 2)",
+      "risk": "medium"
+    },
+    {
+      "name": "AddHook",
+      "signature": "void AddHook(GentaHook, String HookLabel, function)",
+      "category": "hook",
+      "description": "Oyun olaylarina fonksiyon baglar. Hook isimleri: OnTextPacket, OnVarlist, OnTouch, OnRender, OnRawPacket, OnGameUpdatePacket, OnENetInit. HookLabel benzersiz olmali.",
+      "example": "AddHook('OnVarlist', 'varlist_izle', function(vars, netid) logToConsole(vars[0]) end)",
+      "risk": "low"
+    },
+    {
+      "name": "RemoveHooks",
+      "signature": "void RemoveHooks()",
+      "category": "hook",
+      "description": "Tum hooklari kaldirir.",
+      "example": "RemoveHooks()",
+      "risk": "low"
+    },
+    {
+      "name": "RemoveHook",
+      "signature": "void RemoveHook(String HookLabel)",
+      "category": "hook",
+      "description": "Belirtilen etiketli hook'u kaldirir.",
+      "example": "RemoveHook('varlist_izle')",
+      "risk": "low"
+    },
+    {
+      "name": "sleep",
+      "signature": "void sleep(int sleep_in_ms)",
+      "category": "timing",
+      "description": "Script thread'ini verilen milisaniye kadar uyutur. Paket gonderen dongulerde MUTLAKA kullanilmalidir (spam/ban korumasi).",
+      "example": "while true do sleep(500) end",
+      "risk": "low"
+    },
+    {
+      "name": "doToast",
+      "signature": "void doToast(int toastType, int dissMissTimeInMilliSeconds, String text)",
+      "category": "ui",
+      "description": "ImGui toast bildirimi gosterir. toastType: 0=None, 1=Success, 2=Warning, 3=Error, 4=Info.",
+      "example": "doToast(1, 3000, 'Islem basarili!')",
+      "risk": "low"
+    },
+    {
+      "name": "callToast",
+      "signature": "void callToast(String text, int type) -- type=1 uzun, type=0 kisa (Java Toast)",
+      "category": "ui",
+      "description": "Android Java Toast gosterir.",
+      "example": "callToast('Merhaba', 0)",
+      "risk": "low"
+    },
+    {
+      "name": "getScreenSize",
+      "signature": "Vector2f getScreenSize()",
+      "category": "ui",
+      "returns": "Vector2f (x, y)",
+      "description": "Ekran boyutunu dondurur.",
+      "example": "local s = getScreenSize()",
+      "risk": "low"
+    },
+    {
+      "name": "runThread",
+      "signature": "void runThread(function(), [optional] String thread_label)",
+      "category": "thread",
+      "description": "Fonksiyonu ayri bir thread'de calistirir. UI donmamasi icin uzun islemler thread'de yapilmalidir.",
+      "example": "runThread(function() while true do sleep(1000) end end, 'dongu1')",
+      "risk": "low"
+    },
+    {
+      "name": "killAllThread",
+      "signature": "void killAllThread()",
+      "category": "thread",
+      "description": "Tum script thread'lerini oldurur.",
+      "example": "killAllThread()",
+      "risk": "low"
+    },
+    {
+      "name": "getThreadsID",
+      "signature": "table{String} getThreadsID()",
+      "category": "thread",
+      "returns": "Thread etiketleri tablosu",
+      "description": "Calisan thread'lerin etiketlerini dondurur.",
+      "example": "for _, id in pairs(getThreadsID()) do logToConsole(id) end",
+      "risk": "low"
+    },
+    {
+      "name": "killThread",
+      "signature": "void killThread(String thread_label)",
+      "category": "thread",
+      "description": "Belirtilen thread'i oldurur.",
+      "example": "killThread('dongu1')",
+      "risk": "low"
+    },
+    {
+      "name": "hash32",
+      "signature": "int hash32(String)",
+      "category": "useful",
+      "returns": "32-bit uint hash",
+      "description": "Verilen stringin 32-bit hash'ini dondurur.",
+      "example": "logToConsole(hash32('test'))",
+      "risk": "low"
+    },
+    {
+      "name": "hash64",
+      "signature": "int hash64(String)",
+      "category": "useful",
+      "returns": "64-bit uint hash",
+      "description": "Verilen stringin 64-bit hash'ini dondurur.",
+      "example": "logToConsole(hash64('test'))",
+      "risk": "low"
+    },
+    {
+      "name": "logToConsole",
+      "signature": "void logToConsole(String text)",
+      "category": "logging",
+      "description": "GENTAHAX konsoluna yazar (lua_logs.txt'ye dusmez, sadece konsol).",
+      "example": "logToConsole('Merhaba')",
+      "risk": "low"
+    },
+    {
+      "name": "doLog",
+      "signature": "void doLog(String text)",
+      "category": "logging",
+      "description": "Log dosyasina yazar (lua_logs.txt).",
+      "example": "doLog('Bu kaydedilir')",
+      "risk": "low"
+    },
+    {
+      "name": "doLogError",
+      "signature": "void doLogError(String text) -- Logcat seviyesi",
+      "category": "logging",
+      "description": "Logcat error seviyesinde loglar.",
+      "example": "doLogError('Hata!')",
+      "risk": "low"
+    },
+    {
+      "name": "doLogInfo",
+      "signature": "void doLogInfo(String text) -- Logcat seviyesi",
+      "category": "logging",
+      "description": "Logcat info seviyesinde loglar.",
+      "example": "doLogInfo('Bilgi')",
+      "risk": "low"
+    },
+    {
+      "name": "sendWebhook",
+      "signature": "void sendWebhook(String url, DiscordWebhook)",
+      "category": "connection",
+      "description": "Discord webhook'una mesaj/embed gonderir. DiscordWebhook yapisi: username, avatar_url, content, useEmbeds, embeds.",
+      "example": "sendWebhook('https://discord.com/api/webhooks/...', {username='Bot', content='Merhaba', useEmbeds=false})",
+      "risk": "low"
+    },
+    {
+      "name": "makeRequest",
+      "signature": "Response makeRequest(String url, String method, std::list<String> header, String body, int connection_time_out)",
+      "category": "connection",
+      "returns": "Response (content)",
+      "description": "HTTP istegi yapar. method: 'GET'/'POST'. Donus: Response.content. DLL icinde ornek kullanim: load(makeRequest(url,'GET').content)()",
+      "example": "local resp = makeRequest('https://api.example.com', 'GET'); logToConsole(resp.content)",
+      "risk": "low"
+    },
+    {
+      "name": "getItemByID",
+      "signature": "ItemInfo* getItemByID(int itemID)",
+      "category": "itemdb",
+      "returns": "ItemInfo*",
+      "description": "Esya ID'sinden esya bilgisini dondurur (name, rarity, growth, texture, collisionType, clothType, blockType). Oyunun canli items.dat'ini sorgular.",
+      "example": "local item = getItemByID(2); logToConsole(item.name)",
+      "risk": "low"
+    },
+    {
+      "name": "getItemByName",
+      "signature": "ItemInfo* getItemByName(String itemName)",
+      "category": "itemdb",
+      "returns": "ItemInfo*",
+      "description": "Esya adindan esya bilgisini dondurur.",
+      "example": "local item = getItemByName('Dirt'); logToConsole(item.name .. ' rarity: ' .. item.rarity)",
+      "risk": "low"
+    },
+    {
+      "name": "getCheat",
+      "signature": "bool getCheat(int cheat_code)",
+      "category": "cheat",
+      "returns": "bool",
+      "description": "Belirtilen cheat'in acik olup olmadigini dondurur. Cheat kodlari icin CheatCode enum'una bakin.",
+      "example": "if getCheat(26) then logToConsole('Mod Fly acik') end",
+      "risk": "low"
+    },
+    {
+      "name": "toggleCheat",
+      "signature": "void toggleCheat(int cheat_code, bool state)",
+      "category": "cheat",
+      "description": "Cheat'i acar/kapar. BAN RISKI: Hareketi etkileyen cheatler (Mod Fly, No Clip) sunucu tarafinda anomali olarak algilanabilir.",
+      "example": "toggleCheat(26, true) -- Mod Fly ac",
+      "risk": "medium"
+    },
+    {
+      "name": "restoreMemoryByName",
+      "signature": "void restoreMemoryByName(String cheat_name) -- Buyuk/kucuk harf duyarsiz",
+      "category": "cheat",
+      "description": "Isimle belirtilen bellek yamasini geri alir (or. 'Mod Fly'). DLL'de dogrulanan isimler: Mod Fly, Ghost Mode, Night Vision, Can See Ghost, Anti portal, Anti Checkpoint, Anti Respawn, Anti Take Item, Dev Mode, Fast Fruits, Path Finder, Skip Update, Skip Update v2, No Block, No Clip, Ghost Ship, Anti Gravity.",
+      "example": "restoreMemoryByName('Mod Fly')",
+      "risk": "medium"
+    },
+    {
+      "name": "patchMemoryByName",
+      "signature": "void patchMemoryByName(String cheat_name) -- Buyuk/kucuk harf duyarsiz",
+      "category": "cheat",
+      "description": "Isimle belirtilen bellek yamasini uygular (or. 'Mod Fly'). BAN RISKI: patch + restore hizli donusumleri hareket anomalisine yol acar.",
+      "example": "patchMemoryByName('Mod Fly')",
+      "risk": "medium"
+    },
+    {
+      "name": "findPath",
+      "signature": "bool findPath(int x, int y)",
+      "category": "movement",
+      "returns": "bool",
+      "description": "Oyuncuyu verilen koordinata yurutur (path finding). BAN RISKI: Imkansiz noktalara yurume/sik istek hareket anomalisi.",
+      "example": "findPath(25, 54)",
+      "risk": "medium"
+    }
+  ]
+}

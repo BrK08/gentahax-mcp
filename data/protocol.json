@@ -1,0 +1,80 @@
+{
+  "source": "GENTAHAX v5.61 GTInternal.dll binary (MD5 8f95ed4449dc4893f51d5380e31f8055) string verification + official GENTA-HAX-DOCS",
+  "variant_list": {
+    "what_is_it": "Variant list (variantlist_t), Growtopia istemci-sunucu protokolunun merkezidir: sunucu, oyun icindeki olaylari (konsol mesaji, konusma balonu, oyuncu dogusu, hava durumu...) istemciye variant list paketi ile bildirir. GENTAHAX'in 'Game Variant List' hook'u (OnVarlist) bu paketlerin TAMAMINI yakalar.",
+    "structure": {
+      "cells": 7,
+      "layout": [
+        {"index": 0, "type": "string", "desc": "Fonksiyon adi (olay adi). Or: 'OnConsoleMessage', 'OnTalkBubble', 'OnSpawn'"},
+        {"index": 1, "type": "int/float/string", "desc": "1. parametre — fonksiyona gore tur degisir"},
+        {"index": 2, "type": "int/float/string", "desc": "2. parametre"},
+        {"index": 3, "type": "int/float/string", "desc": "3. parametre (genelde netID)"},
+        {"index": 4, "type": "int/float/string", "desc": "4. parametre"},
+        {"index": 5, "type": "int/float/string", "desc": "5. parametre"},
+        {"index": 6, "type": "int/float", "desc": "6. parametre (genelde -1)"}
+      ],
+      "type_flags": "Hücre tipleri paket basligindaki type-flag bitlerinden okunur; GENTAHAX Lua tarafinda hucreleri hazır tip dönüştürülmüş olarak verir."
+    },
+    "send_usage": "sendVariant(variantlist_t var, int netID, int delay) — ornek: sendVariant({'OnConsoleMessage', 'Sunucuya mesaj'}, -1, 0)",
+    "hook_usage": "AddHook('OnVarlist', 'etiket', function(vars, netid) ... end) — vars[0] fonksiyon adidir",
+    "verified_from_dll_v561": {
+      "desc": "Asagidaki isimler GENTAHAX v5.61 GTInternal.dll icindeki string tablosinda BIREBIR dogrulanmistir (sahte degil, binary'den cikarildi):",
+      "names": [
+        {"name": "OnTalkBubble", "desc": "Oyuncu konusma balonu. vars: netID, text, overlay color... Sohbet dinleyicilerin ana hedefi."},
+        {"name": "OnDialogRequest", "desc": "Sunucu dialog/panel acar (banka, vending, isim degistirme...). Otomatik dialog islemlerinde kullanilir."},
+        {"name": "OnSetPos", "desc": "Oyuncu pozisyonu set edilir (teleport/hareket)."},
+        {"name": "OnSetCurrentWeather", "desc": "Dunya havasi degisir (0=gunes, 6=kar...)."},
+        {"name": "OnCountryState", "desc": "Oyuncunun ulke bayragi guncellenir (Yasak/turuncu elma yasak sistemine bagli)."},
+        {"name": "OnSuperSupportState", "desc": "Super destek (moderator) durumu bildirimi."},
+        {"name": "OnAddNotification", "desc": "Oyuncuya bildirim (banner) eklenir."},
+        {"name": "OnRaceStart", "desc": "Yaris baslar."},
+        {"name": "OnRaceEnd", "desc": "Yaris biter."},
+        {"name": "OnInput", "desc": "Giris (input) olayi."},
+        {"name": "OnClick", "desc": "Tiklama olayi."},
+        {"name": "OnItemClick", "desc": "Esya tiklama olayi."},
+        {"name": "OnDoubleClick", "desc": "Cift tiklama."},
+        {"name": "OnEscape", "desc": "ESC tusu."},
+        {"name": "OnFocus", "desc": "Odak degisimi."},
+        {"name": "OnFishStrike", "desc": "Balik vurur (Auto Fishing sisteminin tetikleyicisi — DLL icinde Auto Fishing bu olayi kullanir)."},
+        {"name": "OnAddNotification", "desc": "Bildirim ekleme."},
+        {"name": "OnAppearing", "desc": "Nesne belirme."},
+        {"name": "OnArrow", "desc": "Ok gosterimi."},
+        {"name": "OnBehalfOf", "desc": "Adina islem (trade vb.)."},
+        {"name": "OnReselect", "desc": "Yeniden secim."},
+        {"name": "OnOpeningCurrentPopup", "desc": "Popup acilisi."}
+      ]
+    },
+    "standard_protocol_names": {
+      "desc": "Asagidakiler Growtopia protokolu standartidir (tum GT proxy/bot projelerinde ve resmi protokolde bilinir); OnVarlist hook'u bunlari da yakalar. Isimler binary string taramasinda sikistirilmis/parcali oldugu icin 'dll dogrulamali' listede degillerdir ama protokolde gercek ve yaygin kullanilir:",
+      "names": [
+        {"name": "OnConsoleMessage", "desc": "Konsol/sistem mesaji (en sik gecen variant)."},
+        {"name": "OnSpawn", "desc": "Dunyaya giriste/dogusta tum oyuncu bilgisi (name, netID, kiyafetler, country) bu paketle gelir."},
+        {"name": "OnPlayerMoved", "desc": "Oyuncu hareket guncellemesi."},
+        {"name": "OnRemove", "desc": "Oyuncu dunyadan ayrilinca netID kaldirilir."},
+        {"name": "OnNameChanged", "desc": "Isim degisikligi."},
+        {"name": "OnStoreRequest", "desc": "Store/dukkan verisi."},
+        {"name": "OnPing", "desc": "Ping istegi/yaniti."},
+        {"name": "OnParticleEffect", "desc": "Parcacik efekti."},
+        {"name": "OnTileUpdate", "desc": "Tile guncellemesi."}
+      ]
+    }
+  },
+  "text_packet_protocol": {
+    "desc": "Text paketleri 'anahtar|deger' satirlarindan olusur. GENTAHAX v5.61 DLL icinde birebir dogrulanan action'lar:",
+    "verified_actions": [
+      {"action": "action|join_request", "desc": "Dunyaya giris istegi. name|DUNYAADI ile birlikte gonderilir."},
+      {"action": "action|enter_game", "desc": "Oyuna giris (login) istegi — sik gonderilmesi kalici ban riski tasir."},
+      {"action": "action|input", "desc": "Sohbet/komut girisi. text|/go BUYS  formatiyla."},
+      {"action": "action|drop", "desc": "Esya atma. itemID|X|n|Miktar formatiyla."},
+      {"action": "action|wrench", "desc": "Anahtar (wrench) kullanimi. tilex|X|tiley|Y ile."},
+      {"action": "action|dialog_return", "desc": "Dialog yaniti (banka islemi, autopull onayi...). Otomatiklastirilirsa dikkat."}
+    ],
+    "common_format": "Ornek: sendPacket(2, 'action|input\\ntext|/go START') — type 2 = text packet",
+    "login_sequence_note": "DLL icinde login ornek degerleri: game_version|4.64, platform 0/1, tankIDName/tankIDPass (kullanici kimligi — MCP bunlara ASLA dokunmaz, yalnizca oyun kendi gonderir)."
+  },
+  "raw_packet_notes": {
+    "tile_change": "Blok koyma/kesme: sendPacketRaw ile type=3, state=16, value=itemID, x/y=pozisyon (Android) veya requestTileChange(x, y, itemID) — resmi fonksiyon tercih edin.",
+    "punch": "Blok kirma: type=3, state=18 (punch), punchx/punchy=hedef tile.",
+    "wrench": "Tile aktivasyon: type=7 (PACKET_TILE_ACTIVATE_REQUEST) veya action|wrench text paketi."
+  }
+}

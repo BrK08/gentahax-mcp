@@ -1,0 +1,67 @@
+{
+  "source": "Templates derived from OFFICIAL GENTA-HAX-DOCS examples (extender.lua, Genta_ImDemo.lua) — API calls are real & verified",
+  "items_note": "Growtopia esya veritabani (items.dat) oyunun icinde 10.000+ esya ile tutulur. AUTHORITATIVE kaynak OYUN KENDISIDIR: getItemByName('Dirt') her zaman dogru verir. Asagidaki cerceve ise bilinen, sabit, yaygin esya ID'leridir (birdegistir/muteferrik kaynaklarla capraz dogrulanmis)",
+  "verified_common_items": [
+    {"id": 2, "name": "Dirt", "desc": "En temel blok"},
+    {"id": 6, "name": "Door", "desc": "Kapi"},
+    {"id": 8, "name": "Bedrock", "desc": "Kirilamaz taban"},
+    {"id": 12, "name": "Main Door", "desc": "Dunya ana kapisi"},
+    {"id": 14, "name": "Sign", "desc": "Tabela"},
+    {"id": 18, "name": "Background", "desc": "Duz arka plan"},
+    {"id": 32, "name": "Block", "desc": "Duz blok"},
+    {"id": 24, "name": "Cave Background", "desc": "Magara arka plani"},
+    {"id": 100, "name": "Random Block", "desc": "Rastgele blok"},
+    {"id": 564, "name": "White Portal", "desc": "Portal"},
+    {"id": 566, "name": "Bedrock Heart", "desc": "Cekirdek"},
+    {"id": 1796, "name": "World Lock", "desc": "Dunya kilidi"},
+    {"id": 1876, "name": "Chest", "desc": "Sandik"},
+    {"id": 2242, "name": "Growtoken", "desc": "Growtoken"},
+    {"id": 340, "name": "Gems", "desc": "Elmas (drop objesi)"},
+    {"id": 112, "name": "Dirt Seed", "desc": "Tohum ornegi — tohumlar itemID+1 mantiginda DEGILDIR, getItemByName ile sorgulayin"}
+  ],
+  "runtime_lookup_warning": "Bu liste cercevedir; script icinde asla elle ID hardcode etmek yerine getItemByName('Esya Adi') kullanin — oyunun kendi veritabanindan gercek zamanli, GUARANTILI dogru sonucu alirsiniz.",
+  "templates": [
+    {
+      "id": "auto_collect",
+      "name": "Auto Collect (Yerdeki esyalari topla)",
+      "risk": "medium",
+      "code": "-- mr_berk GENTAHAX MCP Template: Auto Collect\n-- Risk: ORTA (bot paterni) — delay'ler insan benzeri tutuldu\nlocal delay = 350\n\nlocal function collectLoop()\n    while true do\n        local objects = getWorldObject()\n        for _, obj in pairs(objects) do\n            local me = getLocal()\n            local dx = math.abs(obj.pos.x - me.pos.x)\n            local dy = math.abs(obj.pos.y - me.pos.y)\n            if dx <= 12 and dy <= 12 then\n                requestCollect(obj.pos.x, obj.pos.y, obj.id)\n                sleep(math.random(200, 500)) -- rastgelelik = bot algilamayi azaltir\n            end\n        end\n        sleep(delay)\n    end\nend\n\nrunThread(collectLoop, 'auto_collect')\ndoToast(1, 3000, 'Auto Collect basladi (mr_berk)')\n\n-- Durdurmak icin: killThread('auto_collect')"
+    },
+    {
+      "id": "varlist_logger",
+      "name": "Variant List Logger (Tum sunucu olaylarini izle)",
+      "risk": "low",
+      "code": "-- mr_berk GENTAHAX MCP Template: Variant List Logger\n-- Risk: DUSUK — sadece okuma\n-- Sunucudan gelen HER variant list paketini loglar.\n-- Gercek variant isimlerini canli gormek icin en iyi arac.\n\nAddHook('OnVarlist', 'vlog', function(vars, netid)\n    local name = tostring(vars[0])\n    local args = {}\n    for i = 1, 6 do\n        if vars[i] ~= nil then args[#args+1] = tostring(vars[i]) end\n    end\n    logToConsole('[VARLIST] ' .. name .. ' | ' .. table.concat(args, ' , ') .. ' | netID: ' .. tostring(netid))\nend)\n\nlogToConsole('Variant List Logger aktif — mr_berk')"
+    },
+    {
+      "id": "chat_command",
+      "name": "Sohbet Komut Sistemi (OnTextPacket)",
+      "risk": "low",
+      "code": "-- mr_berk GENTAHAX MCP Template: Sohbet Komut Sistemi\n-- Kendi /komutlarinizi yazar. Risk: DUSUK (yalnizca paket okuma)\n\nlocal komutlar = {}\n\nfunction komutlar.bilgi()\n    local me = getLocal()\n    local w = getWorld()\n    logToConsole('Oyuncu: ' .. me.name .. ' | Gems: ' .. me.gems .. ' | Dunya: ' .. w.name)\nend\n\nfunction komutlar.envanter()\n    for _, item in pairs(getInventory()) do\n        local info = getItemByID(item.id)\n        if info then logToConsole(info.name .. ' x' .. item.amount) end\n    end\nend\n\nAddHook('OnTextPacket', 'cmd', function(flag, pkt)\n    -- kendi yazdigin mesajlari yakala: action|input ile gider\n    if pkt:find('action|input') then\n        local text = pkt:match('text|(.+)')\n        if text then\n            local cmd, arg = text:match('^/(%S+)%s*(.*)')\n            if cmd and komutlar[cmd] then\n                komutlar[cmd](arg)\n            end\n        end\n    end\nend)"
+    },
+    {
+      "id": "esp_overlay",
+      "name": "Player ESP Overlay (OnRender + worldToScreen)",
+      "risk": "low",
+      "code": "-- mr_berk GENTAHAX MCP Template: Player ESP\n-- Risk: DUSUK — tamamen istemci tarafli cizim, sunucuya paket gitmez\n\nAddHook('OnRender', 'esp', function(deltaTime)\n    local draw = ImGui.GetBackgroundDrawList()\n    if not draw then return end\n    for _, p in pairs(getPlayerlist()) do\n        local s = worldToScreen(p.pos.x, p.pos.y)\n        if s then\n            draw:AddRect(ImVec2(s.x - 20, s.y - 60), ImVec2(s.x + 20, s.y), ImGui.ColorConvertFloat4ToU32(ImVec4(1.0, 0.2, 0.2, 1.0)), 0.0, 0, 2.0)\n            draw:AddText(ImVec2(s.x - 20, s.y - 75), 0xFFFFFFFF, p.name .. ' (' .. p.country .. ')')\n        end\n    end\nend)"
+    },
+    {
+      "id": "tree_harvest",
+      "name": "Hazir Agac Hasadi (getExtraTile + ready)",
+      "risk": "medium",
+      "code": "-- mr_berk GENTAHAX MCP Template: Hazir Agac Hasadi\n-- Risk: ORTA — punch spam'e dikkat, delay kullanildi\nlocal me = getLocal()\nlocal w = getWorld()\n\nlocal function harvestReady()\n    for y = 0, w.height - 1 do\n        for x = 0, w.width - 1 do\n            local te = getExtraTile(x, y)\n            if te and te.valid and te.ready then\n                if findPath(x, y + 1) then\n                    sleep(400)\n                    sendPacketRaw(false, {type = 3, state = 18, punchx = x, punchy = y, x = x, y = y + 1})\n                    sleep(500)\n                end\n            end\n        end\n        sleep(50)\n    end\nend\n\nrunThread(harvestReady, 'harvest')\nlogToConsole('Hazir agaclar hasat ediliyor — mr_berk')"
+    },
+    {
+      "id": "imgui_panel",
+      "name": "ImGui Kontrol Paneli",
+      "risk": "low",
+      "code": "-- mr_berk GENTAHAX MCP Template: ImGui Kontrol Paneli\n-- Risk: DUSUK — sadece arayuz\nlocal acik = false\n\nAddHook('OnRender', 'panel', function(deltaTime)\n    ImGui.Begin('mr_berk Panel')\n    ImGui.TextUnformatted('GENTAHAX MCP Kontrol Paneli')\n    ImGui.Separator()\n\n    local me = getLocal()\n    if me then\n        ImGui.TextUnformatted('Oyuncu: ' .. me.name)\n        ImGui.TextUnformatted('Gems: ' .. me.gems .. ' | Ping: ' .. me.ping)\n    end\n    local w = getWorld()\n    if w then ImGui.TextUnformatted('Dunya: ' .. w.name) end\n\n    ImGui.Separator()\n    local changed, val = ImGui.Checkbox('Mod Fly (ORTA RISK)', acik)\n    if changed then\n        acik = val\n        toggleCheat(26, acik) -- 26 = Mod Fly\n    end\n\n    if ImGui.Button('Tum Hooklari Kaldir') then\n        RemoveHooks()\n        doToast(4, 2000, 'Hooklar kaldirildi — mr_berk')\n    end\n    ImGui.End()\nend)"
+    },
+    {
+      "id": "webhook_notify",
+      "name": "Discord Webhook Bildirimi",
+      "risk": "low",
+      "code": "-- mr_berk GENTAHAX MCP Template: Discord Webhook\n-- Risk: DUSUK (oyun acisindan) — sadece kendi verinizi gonderin\nlocal WEBHOOK_URL = 'BURAYA_WEBHOOK_URL'\n\nlocal function bildir(baslik, mesaj)\n    sendWebhook(WEBHOOK_URL, {\n        username = 'GENTAHAX Bot',\n        content = '',\n        useEmbeds = true,\n        embeds = {\n            {\n                title = baslik,\n                description = mesaj,\n                color = 3447003,\n                footer = { text = 'mr_berk GENTAHAX MCP' }\n            }\n        }\n    })\nend\n\n-- Ornek: oyuna girince bildir\nAddHook('OnTextPacket', 'giris', function(flag, pkt)\n    if pkt:find('action%|log') then\n        bildir('Oyun Bildirimi', 'Baglanti kuruldu: ' .. tostring(getWorld() and getWorld().name or '?'))\n    end\nend)"
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "source": "OFFICIAL GENTA-HAX-DOCS DOCS-WINDOWS.md + GENTAHAX v5.61 GTInternal.dll binary verification",
+  "engine": "Lua 5.4.6",
+  "script_path": "Script/here.lua (GENTAHAX kurulu dizine gore)",
+  "functions": [
+    {
+      "name": "GetLocal",
+      "signature": "NetAvatar* GetLocal()",
+      "category": "player",
+      "description": "Yerel oyuncunun NetAvatar nesnesini dondurur. Windows surumunde NetAvatar alanlari: name, status, ances, netid, necklace, ping, skin, day, mask, face, accountsecured, back, pants, role_day, captcha, level, feet, shirt, haveaccount, month, awesomeness, hair, hand, botid, gems, posY, posX, tournament.",
+      "example": "local me = GetLocal(); Log('Hosgeldin ' .. me.name)",
+      "risk": "low"
+    },
+    {
+      "name": "GetPlayerlist",
+      "signature": "std::list<NetAvatar*> GetPlayerlist()",
+      "category": "player",
+      "description": "Dunyadaki tum oyuncularin listesini dondurur.",
+      "example": "for _, p in pairs(GetPlayerlist()) do Log(p.name) end",
+      "risk": "low"
+    },
+    {
+      "name": "GetInventory",
+      "signature": "std::list<Inventory*> GetInventory()",
+      "category": "inventory",
+      "description": "Envanteri (id, amount) dondurur.",
+      "example": "for _, it in pairs(GetInventory()) do Log(it.id .. ' x' .. it.amount) end",
+      "risk": "low"
+    },
+    {
+      "name": "GetWorld",
+      "signature": "World* GetWorld()",
+      "category": "world",
+      "description": "Dunya bilgisini dondurur (name, width, height, tilecount).",
+      "example": "local w = GetWorld(); Log(w.name)",
+      "risk": "low"
+    },
+    {
+      "name": "CheckTile",
+      "signature": "Tile* CheckTile(int x, int y)",
+      "category": "world",
+      "description": "Koordinattaki tile'i dondurur (fg, bg, ready, x, y).",
+      "example": "local t = CheckTile(25, 54)",
+      "risk": "low"
+    },
+    {
+      "name": "GetTile",
+      "signature": "std::vector<Tile*> GetTile()",
+      "category": "world",
+      "description": "Tum tile'lari dondurur.",
+      "example": "local tiles = GetTile()",
+      "risk": "low"
+    },
+    {
+      "name": "GetWorldObject",
+      "signature": "std::list<WorldObject*> GetWorldObject()",
+      "category": "world",
+      "description": "Yerdeki nesneleri dondurur (id, amount, oid, invbits, x, y).",
+      "example": "for _, o in pairs(GetWorldObject()) do Log(o.id) end",
+      "risk": "low"
+    },
+    {
+      "name": "GetNPC",
+      "signature": "std::list<NPCList*> GetNPC()",
+      "category": "world",
+      "description": "NPC listesini dondurur.",
+      "example": "for _, n in pairs(GetNPC()) do Log(n.id) end",
+      "risk": "low"
+    },
+    {
+      "name": "SendPacket",
+      "signature": "void SendPacket(int type, String pkt)",
+      "category": "packet",
+      "description": "Text paketi gonderir. BAN RISKI: Spam dongulerinde algilanir.",
+      "example": "SendPacket(2, 'action|input\\ntext|/go START')",
+      "risk": "medium"
+    },
+    {
+      "name": "SendPacketRaw",
+      "signature": "void SendPacketRaw(int flags, TankPacketStruct packet)",
+      "category": "packet",
+      "description": "Raw paket gonderir. DIKKAT: Windows surumunde ilk parametre send_to_client (bool) degil flags (int)'tir. ENet flagleri: 0=RELIABLE, 1=UNSEQUENCED, 2=NO_ALLOCATE, 3=UNRELIABLE_FRAGMENT, 8=SENT.",
+      "example": "SendPacketRaw(1, {type = 3, state = 16, value = 18, x = 50, y = 30, punchx = 50, punchy = 30})",
+      "risk": "medium"
+    },
+    {
+      "name": "sleep",
+      "signature": "void sleep(int sleep_in_ms)",
+      "category": "timing",
+      "description": "Thread'i uyutur. Paket dongulerinde zorunlu.",
+      "example": "sleep(500)",
+      "risk": "low"
+    },
+    {
+      "name": "PlaySound",
+      "signature": "void PlaySound(String m_sound_path)",
+      "category": "useful",
+      "description": "Ses dosyasi calar (Windows'a ozel).",
+      "example": "PlaySound('C:\\Windows\\Media\\notify.wav')",
+      "risk": "low"
+    },
+    {
+      "name": "AddHook",
+      "signature": "void AddHook(GentaHook, String HookLabel, function)",
+      "category": "hook",
+      "description": "Hook ekler. Windows hooklari: OnPacket, OnVarlist, OnProcessRaw.",
+      "example": "AddHook('OnPacket', 'pkt', function(flag, pkt) Log(pkt) end)",
+      "risk": "low"
+    },
+    {
+      "name": "RemoveHooks",
+      "signature": "void RemoveHooks()",
+      "category": "hook",
+      "description": "Tum hooklari kaldirir.",
+      "example": "RemoveHooks()",
+      "risk": "low"
+    },
+    {
+      "name": "RemoveHook",
+      "signature": "void RemoveHook(String HookLabel)",
+      "category": "hook",
+      "description": "Tek hook'u kaldirir.",
+      "example": "RemoveHook('pkt')",
+      "risk": "low"
+    },
+    {
+      "name": "Log",
+      "signature": "void Log(String text)",
+      "category": "logging",
+      "description": "GENTAHAX log konsoluna yazar.",
+      "example": "Log('Merhaba dunya')",
+      "risk": "low"
+    },
+    {
+      "name": "GetItemByID",
+      "signature": "ItemInfo* GetItemByID(int itemID)",
+      "category": "itemdb",
+      "description": "Esya bilgisini dondurur. Windows ItemInfo: Name, ItemType, Rarity, Growth, Collision.",
+      "example": "Log(GetItemByID(2).Name)",
+      "risk": "low"
+    },
+    {
+      "name": "FindPath",
+      "signature": "bool FindPath(int x, int y, int delay)",
+      "category": "movement",
+      "description": "Path finding ile oyuncuyu yurutur. DIKKAT: Windows surumunde ucuncu parametre delay (ms)'dir, Android'de yoktur.",
+      "example": "FindPath(25, 54, 100)",
+      "risk": "medium"
+    }
+  ]
+}
