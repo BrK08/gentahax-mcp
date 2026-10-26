@@ -15,6 +15,8 @@
 
 *SAHTE DEĞİL — GERÇEK VERİLERLE EĞİTİLDİ*
 
+📚 **Kurulum rehberi:** [KURULUM.md](KURULUM.md) (Türkçe) · [INSTALL.md](INSTALL.md) (English)
+
 </div>
 
 ---
@@ -136,6 +138,9 @@ Nasıl çalışır:
 ---
 
 ## 🚀 Kurulum
+
+> 📚 **Sıfırdan başlayan biri için tam rehber:** **[KURULUM.md](KURULUM.md)** (Türkçe) · [INSTALL.md](INSTALL.md) (English) — gereksinimler, adım adım kurulum, sorun giderme ve SSS dahil.
+> Aşağıda hızlı özet var:
 
 ### 1) Gereksinimler
 ```bash
