@@ -5,7 +5,7 @@
 > Windows paths are shown by default; Android differences are marked separately.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.1.0 · 39 tools · 6832 real item IDs
+👑 <b>mr_berk</b> edition — v1.2.0 · 40 tools · 6832 real item IDs
 </div>
 
 ---
@@ -257,8 +257,8 @@ After setup, you don't need to do anything special — **just talk**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.1.0 — mr_berk edition
-Trained on real data · Ban-risk warning system · 39 tools · 6832 real item IDs
+GENTAHAX MCP v1.2.0 — mr_berk edition
+Trained on real data · Ban-risk warning system · 40 tools · 6832 real item IDs
 ```
 
 *Found it useful? Leave a ⭐ on the repo. Stuck? Open an [Issue](https://github.com/BrK08/gentahax-mcp/issues).*

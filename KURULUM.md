@@ -5,7 +5,7 @@
 > Windows görselleri esas alınmıştır; Android farkları ayrıca işaretlenmiştir.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.1.0 · 39 araç · 6832 gerçek item ID
+👑 <b>mr_berk</b> edition — v1.2.0 · 40 araç · 6832 gerçek item ID
 </div>
 
 ---
@@ -255,8 +255,8 @@ Kurulumdan sonra özel bir şey yapmana gerek yok; **normal konuş**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.1.0 — mr_berk edition
-Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 39 araç · 6832 gerçek eşya ID
+GENTAHAX MCP v1.2.0 — mr_berk edition
+Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
 ```
 
 *Bu rehberi beğendiysen repo'ya ⭐ bırakabilirsin. Sorun yaşarsan [Issues](https://github.com/BrK08/gentahax-mcp/issues) açık.*

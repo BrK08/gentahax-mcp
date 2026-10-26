@@ -11,7 +11,7 @@
 [![Lua](https://img.shields.io/badge/Lua-5.4.6-orange.svg)](https://lua.org)
 [![License](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
-**39 araç** · **6832 gerçek item ID** · **57 Android API** · **18 Windows API** · **32 cheat kodu** · **39 paket tipi** · **22 DLL-doğrulamalı variant fonksiyonu** · **19 ban-risk kuralı**
+**40 araç** · **6832 gerçek item ID** · **57 Android API** · **18 Windows API** · **32 cheat kodu** · **39 paket tipi** · **22 DLL-doğrulamalı variant fonksiyonu** · **19 ban-risk kuralı**
 
 *SAHTE DEĞİL — GERÇEK VERİLERLE EĞİTİLDİ*
 
@@ -36,7 +36,7 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 
 ---
 
-## 🛠️ Araç Seti (39 araç)
+## 🛠️ Araç Seti (40 araç)
 
 ### 📚 Bilgi Tabanı — offline, her zaman çalışır
 | Araç | Açıklama |
@@ -77,6 +77,7 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 | `gh_world_snapshot` | Canlı dünya görüntüsü |
 | 🆕 `gh_world_count_item` | ⭐⭐ **"Dünyada kaç tane X var?" — gerçek canlı sayım** (sadece okur, ban riski yok) |
 | 🆕 `gh_world_census` | Canlı dünyanın TAM eşya sayımı (en çok kullanılanlar fg/bg) |
+| 🆕 `gh_farm_script_gen` | ⭐⭐ **ŞABLON-DIŞ İSTEK ÜRETEÇ** — 'tüm X'leri kır ve gem söyle' türü istekler için hedefe özel tam script üretir (gerçek DB ID'li)
 | `gh_player_info` | Dünyadaki tüm oyuncular |
 | `gh_inventory_dump` | Envanter dökümü |
 | `gh_stop_scripts` | Acil durdurma (killAllThread) |
@@ -134,6 +135,19 @@ Nasıl çalışır:
 3. **Çapraz doğrulama**: oyunun kendi `getItemByID(2).name` sonucu veritabanıyla karşılaştırılır
 
 > Bu akış uçtan uca test edildi: gerçek Lua runtime'ında 6000 tile'lık simüle dünya, dosya-IPC köprüsü ve MCP protokolü üzerinden 30/30 test geçti (`scripts/test_world_count_e2e.py`).
+
+---
+
+## 🧩 Şablon-Dışı İstekler — "tüm pepperları kır ve çıkan gem'i söyle"
+
+Hazır şablonu **olmayan** her istek de çalışır: AI bilgi tabanından (gerçek DB ID'si + gerçek API imzaları) **hedefe özel kod üretir**. `gh_farm_script_gen('Pepper')` örneği:
+
+1. **Çözüm**: "Pepper" → **ID 4570** (6832'lik gerçek DB; belirsiz istekte asla tahmin etmez, aday listeler)
+2. **Üretim**: tarama → punch (`sendPacketRaw`, docs'tan doğrulanmış gerçek paket formatı) → `getLocal().gems` önce/sonra → `FARM_RESULT` raporu `doLog` ile `lua_logs.txt`'ye
+3. **Güvenlik**: üretilen kod **YÜKSEK ban riski** diye işaretlenir ("⚠️ BUNDA BAN RİSKİ VAR" — döngüde punch = farm bot paterni)
+4. **Rapor**: `gh_logs_read` → `"37 pepper kırıldı, +97 gems"` — **gerçek sayılar**, uydurma değil
+
+> Kanıt: `tests/test_adhoc_request.py` — 4 katman (bilgi gerçekliği → gerçek Lua runtime → güvenlik → MCP protokolü), **34/34 geçti**: 37 Pepper fg + 100 Rock sapor içeren simüle dünyada Faz A anında `FOUND:37`, Faz B 37'sini de kırdı, Rock'a **tek punch atılmadı**, `GEMS_GAINED:97` kesin doğru.
 
 ---
 
@@ -198,7 +212,7 @@ Artık AI gerçek zamanlı dünya/oyuncu/envanter verisi okuyabilir ve güvenli 
 ```
 ┌─────────────┐   MCP (stdio)   ┌──────────────┐   bridge_in.txt    ┌──────────────────┐
 │  Claude /    │ ◄────────────► │  server.py   │ ─────────────────► │ gentahax_bridge  │
-│  Cursor AI   │    39 araç     │  knowledge   │ ◄───────────────── │     .lua         │
+│  Cursor AI   │    40 araç     │  knowledge   │ ◄───────────────── │     .lua         │
 └─────────────┘                 │  bridge      │   bridge_out.txt   │ (oyun içinde     │
                                 └──────────────┘                    │  sürekli thread) │
                                                                     └──────────────────┘
@@ -222,7 +236,7 @@ MIT License — bkz. [LICENSE](LICENSE).
 
 ### 👑 mr_berk
 
-`GENTAHAX MCP v1.1.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 39 araç · 6832 gerçek eşya ID
+`GENTAHAX MCP v1.2.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
 
 *Veri: OFFICIAL GENTA-HAX-DOCS + GENTAHAX v5.61 DLL doğrulaması (Lua 5.4.6) + items.dat tabanlı gerçek item ID listesi*
 

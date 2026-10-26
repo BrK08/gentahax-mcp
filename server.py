@@ -29,7 +29,7 @@ import knowledge as K
 import bridge as B
 
 WATERMARK = "mr_berk"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 mcp = FastMCP(
     f"GENTAHAX MCP — {WATERMARK} edition",
@@ -622,6 +622,113 @@ return string.format('WORLD:%s|SIZE:%dx%d|TILES:%d|DISTINCT_FG:%d|DISTINCT_BG:%d
         "en_cok_on_plan": _pairlist(parts.get("TOP_FG")),
         "en_cok_arka_plan": _pairlist(parts.get("TOP_BG")),
         "ban_riski": "YOK — sadece okuma, paket gönderilmedi",
+        "watermark": WATERMARK,
+    }, ensure_ascii=False, indent=2)
+
+
+# --------------------------- ŞABLON-DIŞ İSTEK ÜRETECİ ------------------------
+
+_FARM_LUA = """
+-- mr_berk GENTAHAX ad-hoc script — 'Dunyadaki tum {NAME} bloklarini kir ve cikan gem'i soyle'
+-- Uretildi: gh_farm_script_gen | Hedef ID: {ID} ({NAME}) — GERCEK items.dat veritabanindan
+-- RISK: YUKSEK — dongude punch paketi (farm bot paterni). Insan benzeri rastgele delay'ler
+--        eklendi ama sunucu farm botlarini analiz edebilir. Degerli hesapta kullanma!
+pcall(function() math.randomseed(os.time()) end)
+
+local TARGET = {ID}
+local NAME = '{NAME}'
+
+-- FAZ A — hizli sayim (senkron, koprunun zaman asimina sigar)
+local w = getWorld()
+if not w then return 'ERR|NO_WORLD' end
+local me = getLocal()
+if not me then return 'ERR|NO_LOCAL' end
+local targets = {}
+for _, t in pairs(getTile()) do
+    if t and t.fg == TARGET and t.pos then
+        targets[#targets + 1] = { x = t.pos.x, y = t.pos.y }
+    end
+end
+local gems_before = me.gems or 0
+if #targets == 0 then
+    return string.format('FARM_RESULT|WORLD:%s|TARGET:%d|NAME:%s|FOUND:0|BROKEN:0|GEMS_BEFORE:%d|GEMS_AFTER:%d|GEMS_GAINED:0',
+        tostring(w.name), TARGET, NAME, gems_before, gems_before)
+end
+
+-- FAZ B — kirma thread'i (uzun surer; ilerleme ve sonuc lua_logs.txt'ye duser)
+runThread(function()
+    local broken = 0
+    for _, p in ipairs(targets) do
+        local t = checkTile(p.x, p.y)
+        if t and t.fg == TARGET then
+            sendPacketRaw(false, { type = 3, state = 16, value = 18,
+                                   x = p.x, y = p.y, punchx = p.x, punchy = p.y })
+            broken = broken + 1
+            if broken % 10 == 0 then
+                doLog(string.format('[mr_berk farm] %d/%d %s kirildi', broken, #targets, NAME))
+            end
+            sleep(math.random(450, 1200))
+            if broken % 25 == 0 then sleep(math.random(2000, 4500)) end
+        end
+    end
+    sleep(4000)  -- gem'ler sunucudan birkaç saniye icinde duser
+    local me2 = getLocal()
+    local gems_after = (me2 and me2.gems) or gems_before
+    doLog(string.format('FARM_RESULT|WORLD:%s|TARGET:%d|NAME:%s|FOUND:%d|BROKEN:%d|GEMS_BEFORE:%d|GEMS_AFTER:%d|GEMS_GAINED:%d',
+        tostring(w.name), TARGET, NAME, #targets, broken, gems_before, gems_after, gems_after - gems_before))
+    logToConsole('[mr_berk farm] tamam — rapor lua_logs.txt icinde (gh_logs_read ile oku)')
+    doToast(1, 3000, 'Farm bitti (mr_berk)')
+end, 'farm_{ID}')
+
+return string.format('QUEUED|WORLD:%s|TARGET:%d|NAME:%s|FOUND:%d|GEMS_BEFORE:%d|THREAD:farm_{ID}|NOT:kirma_basladi_rapor_icin_gh_logs_read',
+    tostring(w.name), TARGET, NAME, #targets, gems_before)
+"""
+
+
+@mcp.tool
+def gh_farm_script_gen(item: str) -> str:
+    """⭐ ŞABLON-DIŞ İSTEK ÜRETEÇ: 'dünyadaki tüm X'leri kır ve çıkan toplam gem'i söyle' gibi
+    hazır şablonu OLMAYAN istekler için hedefe özel TAM Lua scripti üretir (kopyala-kullan hazır).
+    Akış: isim → GERÇEK veritabanından ID çözümü (belirsizse adayları listeler, ASLA tahmin etmez)
+    → tam script (getTile tarama → sendPacketRaw punch → getLocal().gems önce/sonra →
+    FARM_RESULT raporu doLog ile lua_logs.txt'ye).
+    ⚠️ Üretilen script YÜKSEK ban riski taşır (döngüde punch = farm bot paterni).
+    Kullanım: 1) dönen scripti gh_script_write ile Script klasörüne kaydet veya küçük dünya için
+    gh_run_lua ile çalıştır, 2) script kessin, 3) gh_logs_read ile FARM_RESULT satırını oku.
+    Örnek: item='Pepper' → ID 4570 çözülür, 37 hedef bulunursa '37 pepper kırıldı, +58 gems' gibi
+    GERÇEK rapor döner."""
+    res = K.item_resolve(item)
+    if not res.get("resolved"):
+        cands = K.items_search(item, 12)
+        return json.dumps({
+            "hata": f"'{item}' kesin çözülemedi — tahmin ETMİYORUM, hangisini kastettin?",
+            "adaylar": [{"id": c["id"], "isim": c["name"], "seed": c["is_seed"]} for c in cands],
+            "ipucu": "Tam isimle tekrar çağır: örn. gh_farm_script_gen('Pepper') veya gh_farm_script_gen('Pepper Tree')",
+            "watermark": WATERMARK,
+        }, ensure_ascii=False, indent=2)
+    tid, tname = res["id"], res["name"]
+    code = _FARM_LUA.replace("{ID}", str(tid)).replace("{NAME}", tname).strip()
+    risk = K.analyze_code(code)
+    return json.dumps({
+        "cozulen": {"id": tid, "isim": tname,
+                    "not": f"ID {tid} gerçek veritabanından (6832 eşya) çözüldü — oyunun getItemByID({tid}).name'i ile çapraz doğrulanabilir"},
+        "istek": f"'Dünyadaki tüm {tname} bloklarını kır ve çıkan toplam gem'i söyle'",
+        "script": code,
+        "ban_riski": {
+            "seviye": risk["risk_label_tr"],
+            "puan": f"{risk['risk_score']}/100",
+            "uyari": "⚠️ BUNDA BAN RİSKİ VAR — döngüde punch paketi farm bot paternidir; "
+                     "delay'ler insan benzeri ama garanti DEĞİLDİR",
+            "kurallar": [f["title"] for f in risk.get("findings", [])][:5],
+        },
+        "kullanim": [
+            f"1) gh_script_write('farm_{tid}.lua', script) ile kaydet — oyunda Lua Executor'dan çalıştır",
+            "   (YA DA küçük dünyalarda doğrudan gh_run_lua ile — Faz A anında QUEUED döner)",
+            "2) Faz A anında döner: kaç hedef bulunduğu + mevcut gem (QUEUED satırı)",
+            "3) Faz B arka planda kırar — ilerleme her 10 blokta lua_logs.txt'ye düşer",
+            "4) gh_logs_read ile FARM_RESULT|... satırını oku: FOUND/BROKEN/GEMS_GAINED gerçek sayılar",
+        ],
+        "durdurma": f"killThread('farm_{tid}')",
         "watermark": WATERMARK,
     }, ensure_ascii=False, indent=2)
 
