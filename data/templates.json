@@ -2,22 +2,86 @@
   "source": "Templates derived from OFFICIAL GENTA-HAX-DOCS examples (extender.lua, Genta_ImDemo.lua) — API calls are real & verified",
   "items_note": "Growtopia esya veritabani (items.dat) oyunun icinde 10.000+ esya ile tutulur. AUTHORITATIVE kaynak OYUN KENDISIDIR: getItemByName('Dirt') her zaman dogru verir. Asagidaki cerceve ise bilinen, sabit, yaygin esya ID'leridir (birdegistir/muteferrik kaynaklarla capraz dogrulanmis)",
   "verified_common_items": [
-    {"id": 2, "name": "Dirt", "desc": "En temel blok"},
-    {"id": 6, "name": "Door", "desc": "Kapi"},
-    {"id": 8, "name": "Bedrock", "desc": "Kirilamaz taban"},
-    {"id": 12, "name": "Main Door", "desc": "Dunya ana kapisi"},
-    {"id": 14, "name": "Sign", "desc": "Tabela"},
-    {"id": 18, "name": "Background", "desc": "Duz arka plan"},
-    {"id": 32, "name": "Block", "desc": "Duz blok"},
-    {"id": 24, "name": "Cave Background", "desc": "Magara arka plani"},
-    {"id": 100, "name": "Random Block", "desc": "Rastgele blok"},
-    {"id": 564, "name": "White Portal", "desc": "Portal"},
-    {"id": 566, "name": "Bedrock Heart", "desc": "Cekirdek"},
-    {"id": 1796, "name": "World Lock", "desc": "Dunya kilidi"},
-    {"id": 1876, "name": "Chest", "desc": "Sandik"},
-    {"id": 2242, "name": "Growtoken", "desc": "Growtoken"},
-    {"id": 340, "name": "Gems", "desc": "Elmas (drop objesi)"},
-    {"id": 112, "name": "Dirt Seed", "desc": "Tohum ornegi — tohumlar itemID+1 mantiginda DEGILDIR, getItemByName ile sorgulayin"}
+    {
+      "id": 2,
+      "name": "Dirt",
+      "desc": "En temel blok"
+    },
+    {
+      "id": 6,
+      "name": "Door",
+      "desc": "Kapi"
+    },
+    {
+      "id": 8,
+      "name": "Bedrock",
+      "desc": "Kirilamaz taban"
+    },
+    {
+      "id": 12,
+      "name": "Main Door",
+      "desc": "Dunya ana kapisi"
+    },
+    {
+      "id": 14,
+      "name": "Sign",
+      "desc": "Tabela"
+    },
+    {
+      "id": 18,
+      "name": "Background",
+      "desc": "Duz arka plan"
+    },
+    {
+      "id": 32,
+      "name": "Block",
+      "desc": "Duz blok"
+    },
+    {
+      "id": 24,
+      "name": "Cave Background",
+      "desc": "Magara arka plani"
+    },
+    {
+      "id": 100,
+      "name": "Random Block",
+      "desc": "Rastgele blok"
+    },
+    {
+      "id": 564,
+      "name": "White Portal",
+      "desc": "Portal"
+    },
+    {
+      "id": 566,
+      "name": "Bedrock Heart",
+      "desc": "Cekirdek"
+    },
+    {
+      "id": 1796,
+      "name": "World Lock",
+      "desc": "Dunya kilidi"
+    },
+    {
+      "id": 1876,
+      "name": "Chest",
+      "desc": "Sandik"
+    },
+    {
+      "id": 2242,
+      "name": "Growtoken",
+      "desc": "Growtoken"
+    },
+    {
+      "id": 340,
+      "name": "Gems",
+      "desc": "Elmas (drop objesi)"
+    },
+    {
+      "id": 112,
+      "name": "Dirt Seed",
+      "desc": "Tohum ornegi — tohumlar itemID+1 mantiginda DEGILDIR, getItemByName ile sorgulayin"
+    }
   ],
   "runtime_lookup_warning": "Bu liste cercevedir; script icinde asla elle ID hardcode etmek yerine getItemByName('Esya Adi') kullanin — oyunun kendi veritabanindan gercek zamanli, GUARANTILI dogru sonucu alirsiniz.",
   "templates": [
@@ -62,6 +126,18 @@
       "name": "Discord Webhook Bildirimi",
       "risk": "low",
       "code": "-- mr_berk GENTAHAX MCP Template: Discord Webhook\n-- Risk: DUSUK (oyun acisindan) — sadece kendi verinizi gonderin\nlocal WEBHOOK_URL = 'BURAYA_WEBHOOK_URL'\n\nlocal function bildir(baslik, mesaj)\n    sendWebhook(WEBHOOK_URL, {\n        username = 'GENTAHAX Bot',\n        content = '',\n        useEmbeds = true,\n        embeds = {\n            {\n                title = baslik,\n                description = mesaj,\n                color = 3447003,\n                footer = { text = 'mr_berk GENTAHAX MCP' }\n            }\n        }\n    })\nend\n\n-- Ornek: oyuna girince bildir\nAddHook('OnTextPacket', 'giris', function(flag, pkt)\n    if pkt:find('action%|log') then\n        bildir('Oyun Bildirimi', 'Baglanti kuruldu: ' .. tostring(getWorld() and getWorld().name or '?'))\n    end\nend)"
+    },
+    {
+      "id": "dirt_farm",
+      "name": "Dirt Farm (kir-topla-koy, insan benzeri delay)",
+      "risk": "medium-high (auto-farm bot paterni; delay'ler zorunlu)",
+      "code": "-- mr_berk GENTAHAX MCP Template: Dirt Farm (kir -> topla -> geri koy)\n-- Risk: ORTA (auto-farm bot paterni sunucuda algilanabilir; rastgele insan benzeri\n--        delay'ler zorunlu, hiz arttirdikca risk YUKSEK'e cikar)\n-- Gercek ID'ler (items.dat): Dirt=2, Dirt Seed=3, Fist=18\n-- Durdurmak icin: killThread('dirt_farm')\n\nlocal DIRT, SEED, FIST = 2, 3, 18\nlocal R     = 10   -- cevrende taranacak yaricap (tile)\nlocal KEEP  = 5    -- envanterde yedek kalacak dirt miktari\n\nlocal function invCount(id)\n    local n = 0\n    for _, it in pairs(getInventory()) do\n        if it.id == id then n = n + it.amount end\n    end\n    return n\nend\n\nlocal function farmLoop()\n    sleep(1500)\n    while true do\n        local me = getLocal()\n        if me then\n            -- 1) Yerde dusen dirt / seed'leri topla\n            for _, obj in pairs(getWorldObject()) do\n                if obj.id == DIRT or obj.id == SEED then\n                    local dx = math.abs(obj.pos.x - me.pos.x)\n                    local dy = math.abs(obj.pos.y - me.pos.y)\n                    if dx <= R and dy <= R then\n                        requestCollect(obj.pos.x, obj.pos.y, obj.id)\n                        sleep(math.random(200, 550))  -- insan benzeri rastgelelik\n                    end\n                end\n            end\n            -- 2) Cevrendeki dirt bloklarini kir (Fist = punch)\n            local broken = 0\n            for x = me.pos.x - R, me.pos.x + R do\n                for y = me.pos.y - R, me.pos.y + R do\n                    local t = checkTile(x, y)\n                    if t and t.fg == DIRT and broken < 3 then\n                        requestTileChange(x, y, FIST)\n                        -- Alternatif punch paketi:\n                        -- sendPacketRaw(false, {type=3, state=16, value=FIST,\n                        --     x=x, y=y, punchx=x, punchy=y})\n                        broken = broken + 1\n                        sleep(math.random(400, 900))\n                    end\n                end\n            end\n            -- 3) Bos fg'ye dirt geri koy (arka plani olan tile'lara — GT kurali)\n            if invCount(DIRT) > KEEP then\n                local placed = 0\n                for x = me.pos.x - R, me.pos.x + R do\n                    for y = me.pos.y - R, me.pos.y + R do\n                        local t = checkTile(x, y)\n                        if t and t.fg == 0 and t.bg ~= 0 and placed < 2 then\n                            requestTileChange(x, y, DIRT)\n                            placed = placed + 1\n                            sleep(math.random(350, 800))\n                        end\n                    end\n                end\n            end\n            -- 4) Arada rastgele yurumek = insan gorunumu\n            if math.random(1, 4) == 1 then\n                local nx = me.pos.x + math.random(-6, 6)\n                local ny = me.pos.y + math.random(-4, 4)\n                if checkPath(nx, ny) then findPath(nx, ny) end\n                sleep(math.random(800, 1600))\n            end\n            logToConsole('[farm] kirilan:' .. broken .. ' dirt:' .. invCount(DIRT))\n        end\n        sleep(math.random(700, 1400))  -- dongu arasi nefes\n    end\nend\n\nrunThread(farmLoop, 'dirt_farm')\ndoToast(1, 3000, 'Dirt Farm basladi (mr_berk)')"
+    },
+    {
+      "id": "human_responder",
+      "name": "Human Responder (gelen oyuncuya insan gibi cevap; Mod A otonom / Mod B AI destekli)",
+      "risk": "low-medium (normal sohbet paketi, rate-limit'li)",
+      "code": "-- mr_berk GENTAHAX MCP Template: Human Responder\n-- \"Dunyaya biri gelirse yazdigi seylere insanmis gibi cevap ver\"\n-- Risk: DUSUK-ORTA (sadece normal sohbet paketi gonderir; delay'ler insan benzeri)\n--\n-- MOD A (bu hali): keyword tablosu + rastgele cevap + 1.5-4 sn yazma gecikmesi.\n--        PC/AI kapaliyken bile OYUN ICINDE otonom calisir.\n-- MOD B (gercek AI cevabi): Claude oturumu acik kalir; AI 'gh_logs_read' ile\n--        olaylari okur, cevabi KENDI yazar, 'gh_run_lua' ile sendPacket gonderir.\n--        Daha gercekci ama AI oturumu acik olmali.\n--\n-- Durdurmak icin: killThread('resp_watch')  ve  RemoveHook('resp_chat')\n\nlocal myName = ''\nlocal seen   = {}   -- dunyada gorulen oyuncular\nlocal pending = 0   -- ayni anda en fazla 1 cevap (spam korumasi)\nlocal seq = 0\n\n-- Anahtar kelime -> cevap adaylari (dunyana gore genislet)\nlocal BRAIN = {\n  ['selam']  = {'sa', 'selam', 'hey'},\n  ['sa']     = {'as', 'sa kanka'},\n  ['nasilsin'] = {'iyidir senden?', 'idare eder', 'iyi sence?'},\n  ['naber']  = {'iyilik', 'fena degil, senden?'},\n  ['ne ariyorsun'] = {'farm yapiyorum', 'bira ugrastim'},\n  ['kimsin'] = {'buranin sahibiyim'},\n  ['bye']    = {'gorusuruz', 'bye'},\n  ['gorusuruz'] = {'bye kanka'}\n}\n\nlocal function say(text)\n    sendPacket(2, 'action|input\\ntext|' .. text)\nend\n\nlocal function replyLater(text)\n    if pending > 0 then return end        -- rate limit: cevap ustune cevap yigma\n    pending = pending + 1\n    seq = seq + 1\n    runThread(function()\n        sleep(math.random(1500, 4000))    -- insan gibi \"yazma\" suresi\n        say(text)\n        pending = pending - 1\n    end, 'resp_reply_' .. seq)\nend\n\nlocal function nameByNetId(netid)\n    for _, p in pairs(getPlayerlist()) do\n        if p.netId == netid then return p.name end\n    end\n    return nil\nend\n\n-- Giris izleyici: getPlayerlist() YEREL BELLEK okur -> paket gonderilmez -> algilanamaz\nlocal function watchPlayers()\n    while true do\n        local me = getLocal()\n        if me then myName = me.name end\n        local cur = {}\n        for _, p in pairs(getPlayerlist()) do\n            cur[p.name] = true\n            if next(seen) ~= nil and not seen[p.name] and p.name ~= myName then\n                replyLater('hosgeldin ' .. p.name)   -- yeni geleni karsila\n            end\n        end\n        seen = cur\n        sleep(1500)\n    end\nend\n\n-- Sohbet yakalayici: OnVarlist hook'u OnTalkBubble olayini dinler (DLL'de dogrulanmis)\nAddHook('OnVarlist', 'resp_chat', function(vars, netid)\n    if vars[0] ~= 'OnTalkBubble' then return end\n    local sender = nameByNetId(netid)\n    local text = ''\n    for i = 1, 6 do                       -- varlist 7 hucreli (0..6)\n        local v = vars[i]\n        if type(v) == 'string' then\n            if not sender then\n                for _, p in pairs(getPlayerlist()) do\n                    if p.name == v then sender = p.name end\n                end\n            end\n            if #v > #text then text = v end -- en uzun string = mesaj metni\n        end\n    end\n    if not sender or sender == myName then return end\n    local low = text:lower()\n    for kw, cands in pairs(BRAIN) do\n        if low:find(kw, 1, true) then\n            replyLater(cands[math.random(#cands)])\n            break\n        end\n    end\nend)\n\nrunThread(watchPlayers, 'resp_watch')\ndoToast(1, 3000, 'Human Responder aktif (mr_berk)')"
     }
   ]
 }

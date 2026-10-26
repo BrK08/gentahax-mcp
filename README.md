@@ -53,7 +53,7 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 | `gh_protocol_guide` | Text paket protokolü (action\|drop, action\|wrench...) |
 | `gh_imgui_api` | 62 ImGui fonksiyonu |
 | `gh_examples_list` / `gh_example_get` | Resmî örnek scriptler |
-| `gh_templates_list` / `gh_template_get` | 7 hazır şablon (Auto Collect, ESP, Varlist Logger...) |
+| `gh_templates_list` / `gh_template_get` | 9 hazır şablon (Auto Collect, ESP, Varlist Logger, **Dirt Farm**, **Human Responder**...) |
 | `gh_item_lookup` | Eşya ID çözümü — 6832'lik GERÇEK veritabanı + seed eşleri |
 | 🆕 `gh_item_db_search` | GERÇEK veritabanında serbest arama (isim veya ID, 6832 eşya) |
 | 🆕 `gh_item_db_info` | ID'nin tam bilgisi: isim, seed eşleri, komşu ID'ler |
