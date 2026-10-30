@@ -5,7 +5,7 @@
 > Windows görselleri esas alınmıştır; Android farkları ayrıca işaretlenmiştir.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.4.0 · 40 araç · 6832 gerçek item ID
+👑 <b>mr_berk</b> edition — v1.5.0 · 45 araç · 6832 gerçek item ID
 </div>
 
 ---
@@ -205,7 +205,7 @@ API anahtarı da config de istemiyorsan: sunucuyu **HTTP modunda** aç → ücre
 ```bat
 cd C:\gentahax-mcp
 python server.py --http --port 8808
-:: → http://127.0.0.1:8808/mcp dinlemeye başlar (40 araç hazır)
+:: → http://127.0.0.1:8808/mcp dinlemeye başlar (45 araç hazır)
 ```
 
 **2) Ücretsiz HTTPS tunnel aç** (ChatGPT/Claude yalnızca HTTPS uç kabul eder):
@@ -220,7 +220,7 @@ cloudflared-windows-amd64.exe tunnel --url http://localhost:8808
 1. Ayarlar → **Connectors** → Advanced → **Developer mode** AÇ
 2. **chatgpt.com/plugins** → **+** → **Add custom MCP server**
 3. Ad: `GENTAHAX` · URL: tunnel adresin + `/mcp` → risk uyarısını onayla → **Create**
-4. Araçlar taranır (40 araç görülmeli) → sohbette sor: *"dirt kaç numara?"*
+4. Araçlar taranır (45 araç görülmeli) → sohbette sor: *"dirt kaç numara?"*
 > Not: planda yazma (run) kısıtlıysa araçlar salt-okuma çalışır (sayım, ID sorgusu OK); kısıtları hesabında test et.
 
 **3B) Claude'da** *(web + mobil + Desktop — ÜCRETSİZ planda bile 1 custom connector hakkı var)*:
@@ -328,8 +328,8 @@ Kurulumdan sonra özel bir şey yapmana gerek yok; **normal konuş**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.4.0 — mr_berk edition
-Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
+GENTAHAX MCP v1.5.0 — mr_berk edition
+Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 45 araç · 6832 gerçek eşya ID
 ```
 
 *Bu rehberi beğendiysen repo'ya ⭐ bırakabilirsin. Sorun yaşarsan [Issues](https://github.com/BrK08/gentahax-mcp/issues) açık.*

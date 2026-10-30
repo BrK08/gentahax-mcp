@@ -11,7 +11,7 @@
 [![Lua](https://img.shields.io/badge/Lua-5.4.6-orange.svg)](https://lua.org)
 [![License](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
-**40 araç** · **6832 gerçek item ID** · **57 Android API** · **18 Windows API** · **32 cheat kodu** · **39 paket tipi** · **22 DLL-doğrulamalı variant fonksiyonu** · **19 ban-risk kuralı**
+**45 araç** · **6832 gerçek item ID** · **57 Android API** · **18 Windows API** · **32 cheat kodu** · **39 paket tipi** · **22 DLL-doğrulamalı variant fonksiyonu** · **19 ban-risk kuralı**
 
 *SAHTE DEĞİL — GERÇEK VERİLERLE EĞİTİLDİ*
 
@@ -36,7 +36,7 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 
 ---
 
-## 🛠️ Araç Seti (40 araç)
+## 🛠️ Araç Seti (45 araç)
 
 ### 📚 Bilgi Tabanı — offline, her zaman çalışır
 | Araç | Açıklama |
@@ -78,6 +78,11 @@ Bu MCP **uydurma veri içermez**. Tüm bilgi tabanı iki doğrulanmış kaynakta
 | 🆕 `gh_world_count_item` | ⭐⭐ **"Dünyada kaç tane X var?" — gerçek canlı sayım** (sadece okur, ban riski yok) |
 | 🆕 `gh_world_census` | Canlı dünyanın TAM eşya sayımı (en çok kullanılanlar fg/bg) |
 | 🆕 `gh_farm_script_gen` | ⭐⭐ **ŞABLON-DIŞ İSTEK ÜRETEÇ** — 'tüm X'leri kır ve gem söyle' türü istekler için hedefe özel tam script üretir (gerçek DB ID'li)
+| 🆕 `gh_script_gen` | ⭐⭐ GENEL SCRIPT ÜRETİCİ — şablon dışı HER hedef ('pepperları kır', 'etrafıma dirt koy', 'sohbeti dinle'...) → gerçek DB ID'li, lupa'da DERLENMİŞ, AUTOTEST işaretli script |
+| 🆕 `gh_auto_test` | ⭐⭐ **OTOMATİK TEST DÖNGÜSÜ** — scripti GENTAHAX'ın KENDİ executor'ında çalıştırır, lua_logs.txt'yi izler → **'✅ ÇALIŞIYOR'** ya da hata + teşhis + otomatik YAMA (karar YALNIZ executor+log'dan gelir) |
+| 🆕 `gh_cheat_set` | ⭐ HAZIR MOD AÇ/KAPAT — 'Mod Fly' gibi 32 yerleşik mod (`toggleCheat` uygular, `getCheat` ile DOĞRULAR; ban-riski uyarılı) |
+| 🆕 `gh_cheat_status` | TÜM hazır modların anlık AÇIK/KAPALI durum tablosu (tek köprü çağrısında hepsi) |
+| 🆕 `gh_compat_check` | APK GÜNCELLEMESİ sonrası uyumluluk testi: 57+18 API'yi canlı yoklar / köprüsüzse 3 senaryolu offline rapor |
 | `gh_player_info` | Dünyadaki tüm oyuncular |
 | `gh_inventory_dump` | Envanter dökümü |
 | `gh_stop_scripts` | Acil durdurma (killAllThread) |
@@ -178,9 +183,23 @@ python chat.py --provider custom  --base-url http://localhost:1234/v1 --model be
 | `ollama` / `lmstudio` | llama3.1 / local-model | **ANAHTAR GEREKMEZ** (lokal, ücretsiz) |
 | `custom` | sen belirt | herhangi bir OpenAI-uyumlu uç |
 
-`chat.py` arka planda AI ↔ 40 MCP aracı arasında **tool-calling döngüsü** kurar: AI istediği aracı çağırır → gerçek sonuç modele döner → nihai cevap. Güvenlik sistem prompt'a gömülü: AI yüksek riskli kodda `gh_code_analyze` yapıp **"⚠️ BUNDA BAN RİSKİ VAR"** demeden `gh_run_lua` çağıramaz. Kanıt: `tests/test_chat_agent.py` (15/15).
+`chat.py` arka planda AI ↔ 45 MCP aracı arasında **tool-calling döngüsü** kurar: AI istediği aracı çağırır → gerçek sonuç modele döner → nihai cevap. Güvenlik sistem prompt'a gömülü: AI yüksek riskli kodda `gh_code_analyze` yapıp **"⚠️ BUNDA BAN RİSKİ VAR"** demeden `gh_run_lua` çağıramaz. AI'lar ayrıca [AI_EGITIM.md](AI_EGITIM.md) eğitim paketiyle otomatik başlar (yalnız gerçek veriden üretilir). Kanıt: `tests/test_chat_agent.py` (15/15) + `tests/test_ai_training.py` (38/38).
 
 **Yol 3 — DOĞRUDAN UYGULAMADAN** (ChatGPT web · Claude web/**mobil** · Claude Desktop): `python server.py --http` → ücretsiz cloudflared tunnel → ChatGPT **Plugins / Developer Mode** veya Claude **Custom Connectors**'a ekle (ücretsiz Claude planında bile 1 connector). Kanıt: `tests/test_http_mode.py` (10/10). Detaylı adımlar: [KURULUM.md](KURULUM.md) Adım 4C.
+
+---
+
+## 🧪 Gerçek Benchmark (v1.5.0) — uydurma yok
+
+**`python tests/benchmark_v150.py`** → **43/43 kanıt geçti** (rapor: [BENCHMARK_V150.md](BENCHMARK_V150.md)). Kanıtlananlar:
+
+- **Gerçek MCP çağrıları**: stdio **süreci** (Claude Desktop'ın yolu) + canlı HTTP süreci üzerinden 45 araç
+- **Gerçek veri**: `gh_item_db_search` → Dirt=2, Pepper=4570 (6832'lik DB'den); eğitim paketindeki her fonksiyon/ID/cheat kodu `data/*.json` ile çapraz doğrulanır — **uydurma: SIFIR**
+- **Gerçek derleme**: lupa `load()` (çalıştırmaz) — oyun fonksiyonları false hata VERMEZ, gerçek gramer hatası yakalanır
+- **Dürüstlük**: köprü yokken araçlar sahte 'çalışıyor' ÜRETMEZ — dürüst `Köprü kapalı / CIHAZ_YOK` döner (A07-A09, E04)
+- **Bu benchmark v1.5.0'da GERÇEK bir çöküş yakaladı ve düzeltti**: lupa motoru araç çağrısı içinde kurulunca sunucu süreci ölüyordu (stdio'da 'Connection closed'); motor artık açılışta kurulur (kanıt A17/E04/E05 + kalıcı regresyon: `tests/test_autotest_loop.py` KATMAN 5)
+
+**AI eğitim paketi:** [AI_EGITIM.md](AI_EGITIM.md) (TR) / [AI_TRAINING.md](AI_TRAINING.md) (EN) — yalnız `data/*.json` GERÇEK verisinden üretilir (`scripts/gen_training_pack.py`), chat.py kullanan AI'lara otomatik enjekte edilir. **APK güncelleme rehberi:** [GUNCELLEME.md](GUNCELLEME.md) / [UPDATING.md](UPDATING.md) — 3 senaryo: küçük güncelleme (çalışmaya devam) / fonksiyon değişti (gh_compat_check etkilenenleri listeler) / köprü kırıldı (yeniden analiz).
 
 ---
 
@@ -245,7 +264,7 @@ Artık AI gerçek zamanlı dünya/oyuncu/envanter verisi okuyabilir ve güvenli 
 ```
 ┌─────────────┐   MCP (stdio)   ┌──────────────┐   bridge_in.txt    ┌──────────────────┐
 │  Claude /    │ ◄────────────► │  server.py   │ ─────────────────► │ gentahax_bridge  │
-│  Cursor AI   │    40 araç     │  knowledge   │ ◄───────────────── │     .lua         │
+│  Cursor AI   │    45 araç     │  knowledge   │ ◄───────────────── │     .lua         │
 └─────────────┘                 │  bridge      │   bridge_out.txt   │ (oyun içinde     │
                                 └──────────────┘                    │  sürekli thread) │
                                                                     └──────────────────┘
@@ -269,7 +288,7 @@ MIT License — bkz. [LICENSE](LICENSE).
 
 ### 👑 mr_berk
 
-`GENTAHAX MCP v1.4.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
+`GENTAHAX MCP v1.5.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 45 araç · 6832 gerçek eşya ID
 
 *Veri: OFFICIAL GENTA-HAX-DOCS + GENTAHAX v5.61 DLL doğrulaması (Lua 5.4.6) + items.dat tabanlı gerçek item ID listesi*
 

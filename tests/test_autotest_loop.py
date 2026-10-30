@@ -19,6 +19,9 @@ Bu test döngünün HER halkasını gerçek olarak doğrular:
   KATMAN 4 — Güvenlik: yüksek riskli kod force'suz çalıştırılmaz; bozuk söz dizimi
              executor'a HİÇ gönderilmez (ve oyun fonksiyonları derleme kontrolünde
              false hata VERMEZ — kullanıcının haklı itirazının kanıtı)
+  KATMAN 5 — SOĞUK BAŞLANGIÇ MCP çağrı zinciri (v1.5.0 çöküş düzeltmesi): taze
+             python sürecinde (Claude Desktop'ın gerçek yolu) lupa'lı araçlar
+             çağrılır — sunucu süreci ölmez, dürüst karar döner
 """
 import json
 import os
@@ -277,6 +280,35 @@ pre_bad = S._syntax_precheck("if true then")
 check("Eksik 'end' yakalanır", pre_bad["sonuc"] == "hata")
 
 B.exec_lua, B.read_logs, B.status = _orig_exec, _orig_logs, _orig_status
+
+# ===========================================================================
+print("=== KATMAN 5: SOĞUK BAŞLANGIÇ MCP ÇAĞRI ZİNCİRİ (v1.5.0 çöküş düzeltmesi) ===")
+# v1.5.0'da lupa LuaRuntime'ı araç çağrısının İÇİNDE kuruluyordu; fastmcp araç
+# gövdelerini pydantic-core çerçevesi altında koşturduğu için SOĞUK süreçte ilk
+# çağrıda Lua PANIC ile sunucu süreci ÖLÜYORDU (stdio yolunda 'Connection closed'
+# — benchmark'ın yakaladığı gerçek hata). Düzeltme: motor açılışta kurulur.
+# Bu katman taze süreci (Claude Desktop yolu) gerçek istemciyle yoklar.
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+async def cold_start_test():
+    async with Client(os.path.join(ROOT_DIR, "server.py")) as client:
+        r1 = await client.call_tool("gh_script_gen", {"goal": "pepperları kır"})
+        j1 = json.loads(r1.data)
+        r2 = await client.call_tool(
+            "gh_auto_test",
+            {"script": "local me = getLocal() return 'FARM_RESULT|OK'", "watch": 3})
+        j2 = json.loads(r2.data)
+        return j1, j2
+
+j1, j2 = asyncio.run(cold_start_test())
+check("SOĞUK süreç: gh_script_gen sunucuyu öldürmüyor (lupa motoru açılışta kurulur)",
+      j1.get("sozdizimi", {}).get("sonuc") in ("geçti", "atıldı"),
+      str(j1.get("sozdizimi")))
+check("SOĞUK süreç: üretilen script gerçek Pepper ID 4570 içeriyor",
+      "4570" in j1.get("script", ""))
+check("SOĞUK süreç: gh_auto_test dürüst karar veriyor (köprüsüz → CIHAZ_YOK)",
+      j2.get("sonuc") == "CIHAZ_YOK", str(j2.get("sonuc")))
+check("SOĞUK süreç: derleme ön-kontrolü çalıştı", j2.get("calistirildi") is False)
 
 # ===========================================================================
 print()

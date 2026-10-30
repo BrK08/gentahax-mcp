@@ -22,6 +22,7 @@ Filigran: mr_berk
 import json
 import os
 import re
+import threading
 import time
 from typing import Optional
 
@@ -1083,22 +1084,37 @@ def gh_cheat_status() -> str:
 
 # ------------------------- OTOMATİK TEST DÖNGÜSÜ ----------------------------
 
+# Lua derleme motoru — AÇILIŞTA (ana thread, modül yüklenirken) BİR KEZ kurulur.
+# NEDEN BÖYLE: lupa LuaRuntime'ı bir MCP araç çağrısının İÇİNDE kurulursa (fastmcp
+# araç gövdesini pydantic-core çalıştırma çerçevesi altında koşturuyor) Lua C-API'si
+# korunmasız hata verip SUNUCU SÜRECİNİ ÖLDÜRÜYORDU (v1.5.0 benchmark'ında stdio/
+# Claude Desktop yolunda 'PANIC ... Connection closed' olarak kanıtlandı). Kurulumu
+# açılışta yapıp çağrılarda yalnız KULLANMAK sorunu tamamen ortadan kaldırıyor.
+# Derleme kilit altında: HTTP modunda eşzamanlı çağrılar tek runtime'a dizilir.
+_LUA_LOCK = threading.Lock()
+try:
+    import lupa as _lupa
+    _LUA_RT = _lupa.LuaRuntime()
+    _LUA_KURULDU = True
+except Exception:  # lupa yoksa veya kurulamadıysa sunucu yine açılır
+    _LUA_RT = None
+    _LUA_KURULDU = False
+
+
 def _syntax_precheck(code):
     """Söz dizimi ön-kontrolü: kodu SADECE DERLER (load) — ASLA ÇALIŞTIRMAZ.
     Oyun içi fonksiyonlar (getLocal, toggleCheat...) DERLEMEYE takılmaz; yalnız gerçek
     gramer hatası (eksik 'end', parantez) yakalanır. Oyun fonksiyonlarının varlığına
     dair TEK yetkili kaynak GENTAHAX executor'ıdır — bu kontrol asla 'fonksiyon yok'
     HATASI ÜRETMEZ. Dönen: {'sonuc': 'geçti'|'hata'|'atıldı', 'detay': str}"""
-    try:
-        import lupa
-    except ImportError:
+    if not _LUA_KURULDU:
         return {"sonuc": "atıldı", "detay": "lupa kurulu değil — atlandı (zaten oyun executor'ı derleyecek)"}
     try:
-        lr = lupa.LuaRuntime()
-        lr.globals()["__mcp_code"] = code
-        lr.execute("__mcp_f, __mcp_e = load(__mcp_code)")
-        ok = bool(lr.eval("__mcp_f ~= nil"))
-        err = str(lr.eval("tostring(__mcp_e)"))
+        with _LUA_LOCK:
+            _LUA_RT.globals()["__mcp_code"] = code
+            _LUA_RT.execute("__mcp_f, __mcp_e = load(__mcp_code)")
+            ok = bool(_LUA_RT.eval("__mcp_f ~= nil"))
+            err = str(_LUA_RT.eval("tostring(__mcp_e)"))
         if ok:
             return {"sonuc": "geçti", "detay": "derleme OK — kod ÇALIŞTIRILMADI, oyun fonksiyonları false hata vermez"}
         return {"sonuc": "hata", "detay": err[:300] if err and err != "nil" else "söz dizimi hatası"}

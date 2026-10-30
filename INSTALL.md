@@ -5,7 +5,7 @@
 > Windows paths are shown by default; Android differences are marked separately.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.4.0 · 40 tools · 6832 real item IDs
+👑 <b>mr_berk</b> edition — v1.5.0 · 45 tools · 6832 real item IDs
 </div>
 
 ---
@@ -197,7 +197,7 @@ python chat.py --ask "how many dirt blocks are in my world?"
 | `lmstudio` | **NO KEY** | lmstudio.ai → Developer → start server |
 | `custom` | your endpoint | any OpenAI-compatible service via `--base-url` + `--model` |
 
-> In the `chat.py` chat, `/tools` lists the 40 tools, `/exit` quits. Same safety: the AI cannot run high-risk code without passing `gh_code_analyze` first.
+> In the `chat.py` chat, `/tools` lists the 45 tools, `/exit` quits. Same safety: the AI cannot run high-risk code without passing `gh_code_analyze` first.
 
 ### 📱 Step 4C — Directly inside the APP (ChatGPT web · Claude web/mobile)
 
@@ -207,7 +207,7 @@ No API key, no config file: start the server in **HTTP mode** → turn it into H
 ```bat
 cd C:\gentahax-mcp
 python server.py --http --port 8808
-:: → listens on http://127.0.0.1:8808/mcp (40 tools ready)
+:: → listens on http://127.0.0.1:8808/mcp (45 tools ready)
 ```
 
 **2) Open a free HTTPS tunnel** (ChatGPT/Claude only accept HTTPS endpoints):
@@ -222,7 +222,7 @@ cloudflared-windows-amd64.exe tunnel --url http://localhost:8808
 1. Settings → **Connectors** → Advanced → enable **Developer mode**
 2. **chatgpt.com/plugins** → **+** → **Add custom MCP server**
 3. Name: `GENTAHAX` · URL: your tunnel URL + `/mcp` → acknowledge the risk warning → **Create**
-4. Tools are scanned (you should see 40 tools) → ask in chat: *"what's the ID of dirt?"*
+4. Tools are scanned (you should see 45 tools) → ask in chat: *"what's the ID of dirt?"*
 > Note: if your plan limits write actions, tools run read-only (counting, ID lookups still work); test in your own account.
 
 **3B) In Claude** *(web + mobile + Desktop — even the FREE plan gets 1 custom connector)*:
@@ -330,8 +330,8 @@ After setup, you don't need to do anything special — **just talk**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.4.0 — mr_berk edition
-Trained on real data · Ban-risk warning system · 40 tools · 6832 real item IDs
+GENTAHAX MCP v1.5.0 — mr_berk edition
+Trained on real data · Ban-risk warning system · 45 tools · 6832 real item IDs
 ```
 
 *Found it useful? Leave a ⭐ on the repo. Stuck? Open an [Issue](https://github.com/BrK08/gentahax-mcp/issues).*
