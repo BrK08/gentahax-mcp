@@ -29,7 +29,7 @@ import knowledge as K
 import bridge as B
 
 WATERMARK = "mr_berk"
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 mcp = FastMCP(
     f"GENTAHAX MCP — {WATERMARK} edition",
@@ -944,8 +944,22 @@ def gh_learn_lua_gentahax(topic: str = "start") -> str:
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import argparse
     import sys
-    if "--list-tools" in sys.argv:
+
+    ap = argparse.ArgumentParser(
+        description=f"GENTAHAX MCP sunucusu — {WATERMARK} edition v{VERSION}")
+    ap.add_argument("--list-tools", action="store_true", help="araçları listele ve çık")
+    ap.add_argument("--http", action="store_true",
+                    help="UZAK HTTP modu (Streamable HTTP) — ChatGPT/Claude uygulamalarından "
+                         "(Plugins/Custom Connectors) bağlanmak için. stdio yerine HTTP uç verir.")
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="HTTP dinleme adresi (varsayılan 127.0.0.1 — yalnızca bu makine; "
+                         "aynı Wi-Fi'daki telefondan erişmek için 0.0.0.0 yapabilirsin ama DİKKAT)")
+    ap.add_argument("--port", type=int, default=8808, help="HTTP portu (varsayılan 8808)")
+    args = ap.parse_args()
+
+    if args.list_tools:
         # Kayıtlı araçları yazdır (test amaçlı)
         import asyncio
         async def _l():
@@ -954,6 +968,17 @@ if __name__ == "__main__":
             for name in sorted(tools):
                 print(f"  • {name}")
         asyncio.run(_l())
+    elif args.http:
+        print(f"[GENTAHAX MCP — {WATERMARK} edition v{VERSION}] HTTP sunucusu başlıyor...")
+        print(f"  Yerel uç   : http://{args.host}:{args.port}/mcp")
+        print("  Uygulamadan (ChatGPT Plugins / Claude Custom Connectors) bağlanmak için:")
+        print(f"    1) Ücretsiz HTTPS tunnel aç:  cloudflared tunnel --url http://localhost:{args.port}")
+        print("    2) Çıkan https://xxxx.trycloudflare.com adresinin SONUNA /mcp ekle")
+        print("    3) ChatGPT: chatgpt.com/plugins → + → Add custom MCP server")
+        print("       Claude  : Customize → Connectors → + Add custom connector (No sign in)")
+        print("  ⚠️  Tunnel açıkken URL'yi bilen herkes araçları çağırabilir —")
+        print("     işin bitince Ctrl+C ile kapat. (gh_run_lua yine güvenli mod + risk analizli)")
+        mcp.run(transport="http", host=args.host, port=args.port)
     else:
         print(f"[GENTAHAX MCP — {WATERMARK} edition v{VERSION}] stdio sunucusu başlıyor...",
               file=sys.stderr)

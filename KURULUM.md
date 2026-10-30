@@ -5,7 +5,7 @@
 > Windows görselleri esas alınmıştır; Android farkları ayrıca işaretlenmiştir.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.3.0 · 40 araç · 6832 gerçek item ID
+👑 <b>mr_berk</b> edition — v1.4.0 · 40 araç · 6832 gerçek item ID
 </div>
 
 ---
@@ -197,6 +197,43 @@ python chat.py --ask "dünyada kaç tane dirt var?"
 
 > `chat.py`'de sohbette `/tools` yazarsan 40 aracı listeler, `/exit` ile çıkarsın. Güvenlik aynı: AI yüksek riskli kodu `gh_code_analyze`'den geçirmeden çalıştıramaz.
 
+### 📱 Adım 4C — DOĞRUDAN UYGULAMADAN (ChatGPT web · Claude web/mobil)
+
+API anahtarı da config de istemiyorsan: sunucuyu **HTTP modunda** aç → ücretsiz tunnel ile HTTPS'e çevir → uygulamanın **Plugins/Connectors** bölümüne ekle. Artık ChatGPT'nin/Claude'ın kendi arayüzünden sorarsın: *"dünyada kaç tane dirt var?"*
+
+**1) Sunucuyu HTTP modunda başlat** (terminal açık kalsın):
+```bat
+cd C:\gentahax-mcp
+python server.py --http --port 8808
+:: → http://127.0.0.1:8808/mcp dinlemeye başlar (40 araç hazır)
+```
+
+**2) Ücretsiz HTTPS tunnel aç** (ChatGPT/Claude yalnızca HTTPS uç kabul eder):
+- [cloudflared](https://github.com/cloudflare/cloudflared/releases) indir (`cloudflared-windows-amd64.exe`) → **ikinci terminalde** çalıştır:
+```bat
+cloudflared-windows-amd64.exe tunnel --url http://localhost:8808
+:: → çıktıda: https://xxxx-xxxx-xxxx.trycloudflare.com  (her açılışta değişir)
+```
+- **MCP uç adresin**: `https://xxxx-xxxx-xxxx.trycloudflare.com/mcp` (sonuna `/mcp` ekle!)
+
+**3A) ChatGPT'de** *(web: chatgpt.com — Plus/Pro/Business/Enterprise planı; mobil uygulamada YOK)*:
+1. Ayarlar → **Connectors** → Advanced → **Developer mode** AÇ
+2. **chatgpt.com/plugins** → **+** → **Add custom MCP server**
+3. Ad: `GENTAHAX` · URL: tunnel adresin + `/mcp` → risk uyarısını onayla → **Create**
+4. Araçlar taranır (40 araç görülmeli) → sohbette sor: *"dirt kaç numara?"*
+> Not: planda yazma (run) kısıtlıysa araçlar salt-okuma çalışır (sayım, ID sorgusu OK); kısıtları hesabında test et.
+
+**3B) Claude'da** *(web + mobil + Desktop — ÜCRETSİZ planda bile 1 custom connector hakkı var)*:
+1. **claude.ai** → **Customize** → **Connectors** → **+ Add custom connector**
+2. URL: tunnel adresin + `/mcp` → Continue → Authentication: **"No sign in"** → **Add**
+3. Sohbette sol alttaki **+** → **Connectors** → GENTAHAX'i aç → sor: *"dünyada kaç tane dirt var?"*
+> Claude **mobil uygulamada da** connector çalışır — telefondan da sorabilirsin.
+
+**⚠️ Güvenlik notu:**
+- Tunnel açıkken URL'yi bilen **herkes** araçlarını çağırabilir. trycloudflare adresi rastgele/geçicidir ama işin bitince **Ctrl+C** ile tunnel'ı ve sunucuyu kapat.
+- `gh_run_lua` yine güvenli mod + risk analizi korumasında — uygulama içinden çağrılsa bile ⚠️ ban uyarısı aynen geçerli.
+- "Bağlanamıyor" derse: 1. ve 2. adım terminalinin hâlâ açık mı? Tunnel adresi her yeniden başlatmada DEĞİŞİR → uygulamada URL'yi güncelle.
+
 ---
 
 ## Adım 5 — Canlı köprüyü kur (dünya/envanter verisi için)
@@ -291,7 +328,7 @@ Kurulumdan sonra özel bir şey yapmana gerek yok; **normal konuş**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.3.0 — mr_berk edition
+GENTAHAX MCP v1.4.0 — mr_berk edition
 Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
 ```
 

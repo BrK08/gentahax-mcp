@@ -180,6 +180,8 @@ python chat.py --provider custom  --base-url http://localhost:1234/v1 --model be
 
 `chat.py` arka planda AI ↔ 40 MCP aracı arasında **tool-calling döngüsü** kurar: AI istediği aracı çağırır → gerçek sonuç modele döner → nihai cevap. Güvenlik sistem prompt'a gömülü: AI yüksek riskli kodda `gh_code_analyze` yapıp **"⚠️ BUNDA BAN RİSKİ VAR"** demeden `gh_run_lua` çağıramaz. Kanıt: `tests/test_chat_agent.py` (15/15).
 
+**Yol 3 — DOĞRUDAN UYGULAMADAN** (ChatGPT web · Claude web/**mobil** · Claude Desktop): `python server.py --http` → ücretsiz cloudflared tunnel → ChatGPT **Plugins / Developer Mode** veya Claude **Custom Connectors**'a ekle (ücretsiz Claude planında bile 1 connector). Kanıt: `tests/test_http_mode.py` (10/10). Detaylı adımlar: [KURULUM.md](KURULUM.md) Adım 4C.
+
 ---
 
 ## 🚀 Kurulum
@@ -267,7 +269,7 @@ MIT License — bkz. [LICENSE](LICENSE).
 
 ### 👑 mr_berk
 
-`GENTAHAX MCP v1.3.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
+`GENTAHAX MCP v1.4.0` — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 40 araç · 6832 gerçek eşya ID
 
 *Veri: OFFICIAL GENTA-HAX-DOCS + GENTAHAX v5.61 DLL doğrulaması (Lua 5.4.6) + items.dat tabanlı gerçek item ID listesi*
 

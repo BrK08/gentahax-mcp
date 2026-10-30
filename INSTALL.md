@@ -5,7 +5,7 @@
 > Windows paths are shown by default; Android differences are marked separately.
 
 <div align="center">
-👑 <b>mr_berk</b> edition — v1.3.0 · 40 tools · 6832 real item IDs
+👑 <b>mr_berk</b> edition — v1.4.0 · 40 tools · 6832 real item IDs
 </div>
 
 ---
@@ -199,6 +199,43 @@ python chat.py --ask "how many dirt blocks are in my world?"
 
 > In the `chat.py` chat, `/tools` lists the 40 tools, `/exit` quits. Same safety: the AI cannot run high-risk code without passing `gh_code_analyze` first.
 
+### 📱 Step 4C — Directly inside the APP (ChatGPT web · Claude web/mobile)
+
+No API key, no config file: start the server in **HTTP mode** → turn it into HTTPS with a free tunnel → add it in the app's **Plugins/Connectors**. Then ask from the app's own UI: *"how many dirt blocks are in my world?"*
+
+**1) Start the server in HTTP mode** (keep the terminal open):
+```bat
+cd C:\gentahax-mcp
+python server.py --http --port 8808
+:: → listens on http://127.0.0.1:8808/mcp (40 tools ready)
+```
+
+**2) Open a free HTTPS tunnel** (ChatGPT/Claude only accept HTTPS endpoints):
+- Download [cloudflared](https://github.com/cloudflare/cloudflared/releases) (`cloudflared-windows-amd64.exe`) → run in a **second terminal**:
+```bat
+cloudflared-windows-amd64.exe tunnel --url http://localhost:8808
+:: → output shows: https://xxxx-xxxx-xxxx.trycloudflare.com  (changes each run)
+```
+- **Your MCP endpoint**: `https://xxxx-xxxx-xxxx.trycloudflare.com/mcp` (append `/mcp`!)
+
+**3A) In ChatGPT** *(web: chatgpt.com — Plus/Pro/Business/Enterprise plans; NOT in the mobile app)*:
+1. Settings → **Connectors** → Advanced → enable **Developer mode**
+2. **chatgpt.com/plugins** → **+** → **Add custom MCP server**
+3. Name: `GENTAHAX` · URL: your tunnel URL + `/mcp` → acknowledge the risk warning → **Create**
+4. Tools are scanned (you should see 40 tools) → ask in chat: *"what's the ID of dirt?"*
+> Note: if your plan limits write actions, tools run read-only (counting, ID lookups still work); test in your own account.
+
+**3B) In Claude** *(web + mobile + Desktop — even the FREE plan gets 1 custom connector)*:
+1. **claude.ai** → **Customize** → **Connectors** → **+ Add custom connector**
+2. URL: your tunnel URL + `/mcp` → Continue → Authentication: **"No sign in"** → **Add**
+3. In a chat, click **+** (bottom left) → **Connectors** → enable GENTAHAX → ask: *"how many dirt blocks are in my world?"*
+> Claude connectors also work in the **mobile app** — you can ask from your phone.
+
+**⚠️ Security notes:**
+- While the tunnel is open, ANYONE who knows the URL can call your tools. The trycloudflare address is random and temporary — still, close the tunnel and server with **Ctrl+C** when done.
+- `gh_run_lua` keeps its safe-mode + risk-analysis protection — the ⚠️ ban warning applies even when called from inside an app.
+- "Can't connect"? Are the terminals from steps 1–2 still open? The tunnel URL CHANGES on every restart → update it in the app.
+
 ---
 
 ## Step 5 — Set up the live bridge (for world/inventory data)
@@ -293,7 +330,7 @@ After setup, you don't need to do anything special — **just talk**:
 ## 👑 mr_berk
 
 ```
-GENTAHAX MCP v1.3.0 — mr_berk edition
+GENTAHAX MCP v1.4.0 — mr_berk edition
 Trained on real data · Ban-risk warning system · 40 tools · 6832 real item IDs
 ```
 
