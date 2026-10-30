@@ -9,8 +9,8 @@ bağlanır. Bu test, bir UYGULAMANIN yapacağı bağlantıyı birebir taklit ede
 
   TEST A — HTTP sunucusu ayaklanır ve /mcp uç noktası yayınlanır
   TEST B — Gerçek Streamable HTTP istemcisi (fastmcp Client(URL)) bağlanır,
-           40 araç listeler (ChatGPT'nin "Scan Tools" adımıyla aynı)
-  TEST C — gh_about HTTP üzerinden çağrılır → v1.4.0 + mr_berk filigranı
+           45 araç listeler (ChatGPT'nin "Scan Tools" adımıyla aynı)
+  TEST C — gh_about HTTP üzerinden çağrılır → v1.5.0 + mr_berk filigranı
   TEST D — GERÇEK item veritabanı HTTP üzerinden çalışır (Dirt = 2)
   TEST E — Ban-riski güvenlik zinciri HTTP üzerinden de aktif (YÜKSEK + banner)
   TEST F — Köprüsüz canlı araç zarif davranır (çökmez, yol gösterir)
@@ -82,12 +82,12 @@ try:
     async def client_flow():
         async with Client(URL) as client:
             tools = await client.list_tools()
-            check(f"Bağlantı OK — araç listesi geldi (Scan Tools): {len(tools)} araç", len(tools) == 40, str(len(tools)))
+            check(f"Bağlantı OK — araç listesi geldi (Scan Tools): {len(tools)} araç", len(tools) == 45, str(len(tools)))
             check("gh_world_count_item listede (canlı araç HTTP'de de kayıtlı)",
                   any(t.name == "gh_world_count_item" for t in tools))
 
             r = J(await client.call_tool("gh_about", {}))
-            check("gh_about HTTP üzerinden: v1.4.0", r.get("version") == "1.4.0", str(r.get("version")))
+            check("gh_about HTTP üzerinden: v1.4.0", r.get("version") == "1.5.0", str(r.get("version")))
             check("Filigran HTTP üzerinden: mr_berk", "mr_berk" in str(r.get("watermark", "")))
 
             r2 = await client.call_tool("gh_item_db_search", {"query": "Dirt", "limit": 5})
@@ -117,7 +117,7 @@ print()
 print("=" * 60)
 print(f"SONUÇ: {ok_count} başarılı, {fail_count} başarısız")
 print()
-print("💡 KANIT: server.py --http, Streamable HTTP üzerinden tüm 40 aracı, gerçek")
+print("💡 KANIT: server.py --http, Streamable HTTP üzerinden tüm 45 aracı, gerçek")
 print("   item veritabanını ve ban-riski güvenlik zincirini aynen servis eder.")
 print("   ChatGPT (Plugins) ve Claude (Custom Connectors) bu uca birebir böyle bağlanır;")
 print("   sadece HTTPS gerekir → ücretsiz cloudflared tunnel ile sağlanır (KURULUM.md Adım 4C).")

@@ -4,12 +4,12 @@ HERHANGİ BİR AI KANIT TESTİ — chat.py (mr_berk)
 ================================================
 Kullanıcı isteği: "Yapay zekası olarak istediğim HERHANGİ BİR yapay zekayı
 kullanmak istiyorum" — chat.py, OpenAI-uyumlu her sağlayıcıyı (OpenAI, Gemini,
-GLM, DeepSeek, OpenRouter, Ollama...) MCP'nin 40 aracına bağlar.
+GLM, DeepSeek, OpenRouter, Ollama...) MCP'nin 45 aracına bağlar.
 
 Bu test GERÇEK bir API anahtarı GEREKMEZ: MockAI (OpenAI yanıt formatını birebir
 taklit eden sahte sağlayıcı) ile aracın tool-calling döngüsü uçtan uca koşar.
 
-  TEST A — Şema üretimi : 40 aracın TÜMÜ geçerli OpenAI function şemasına dönüşür
+  TEST A — Şema üretimi : 45 aracın TÜMÜ geçerli OpenAI function şemasına dönüşür
   TEST B — Tek tur      : MockAI gh_item_db_search('Dirt') çağırır → GERÇEK MCP aracı
                           çalışır → sonuç (Dirt=2) modele geri döner → nihai cevap
   TEST C — Güvenlik akışı: MockAI yüksek riskli kod için gh_code_analyze çağırır →
@@ -53,11 +53,11 @@ async def main():
     from fastmcp import Client
     from server import mcp
 
-    print("=== TEST A: 40 araç → OpenAI function şeması ===")
+    print("=== TEST A: 45 araç → OpenAI function şeması ===")
     async with Client(mcp) as client:
         tools = await client.list_tools()
         schemas = C.build_tool_schemas(tools)
-        check("Tüm araçlar şemaya dönüştü (40)", len(schemas) == 40, str(len(schemas)))
+        check("Tüm araçlar şemaya dönüştü (45)", len(schemas) == 45, str(len(schemas)))
         valid = all(s["type"] == "function" and s["function"]["name"]
                     and isinstance(s["function"]["parameters"], dict)
                     and s["function"]["parameters"].get("type") == "object"

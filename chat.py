@@ -3,7 +3,7 @@
 GENTAHAX MCP — HERHANGİ BİR AI ile SOHBET MODU (mr_berk edition)
 =================================================================
 Claude Desktop'a ihtiyaç YOK. OpenAI-uyumlu (OpenAI-compatible) HERHANGİ bir
-AI'yi GENTAHAX MCP'nin 40 aracına bağlar:
+AI'yi GENTAHAX MCP'nin 45 aracına bağlar:
 
   OpenAI (ChatGPT) · DeepSeek · GLM (Z.ai) · Google Gemini (OpenAI uçları)
   OpenRouter (tek anahtarla 300+ model) · Qwen · Mistral
@@ -94,7 +94,29 @@ KURALLAR (mutlaka uyar):
 4. Canlı oyun verisi (dünya sayımı, oyuncu, envanter) köprü gerektirir. Önce gh_device_status ile kontrol et; 'configured: false' dönerse kullanıcıya KURULUM.md Adım 5'i (gh_bridge_deploy → oyunda Execute → gh_device_status) anlat.
 5. Kullanıcının dilinde cevap ver (varsayılan Türkçe). Kısa, net, SAMİMİ ol.
 6. Ban riski olmayan okuma araçlarını (gh_world_count_item, gh_world_census...) rahatça kullan.
+7. HAZIR MOD isteklerinde ('mod fly aç/kapat', 'no clip kapat'...) gh_cheat_set kullan — script yazma. Tüm modların durumu: gh_cheat_status.
+8. OTOMATİK TEST DÖNGÜSÜ: kullanıcı 'script yaz/çalıştır ve çalışıyor mu bak' derse gh_auto_test kullan; dönen 'kullaniciya_soz' alanını kullanıcıya AYNEN söyle. HATA dönerse önerilen yamayı (yama.script) uygula ve gh_auto_test'i TEKRAR çağır (en fazla 2 kez) — sonra sonucu dürüstçe raporla.
+9. GENEL script isteklerinde (farm, toplama, döşeme, sohbet, panel...) önce gh_script_gen dene — şablon dışı hedefleri o üretir.
 Filigran: {WATERMARK}"""
+
+
+def _load_training_pack():
+    """AI_EGITIM.md varsa sistem prompt'a gömülecek eğitim paketini okur (gerçek verilerden üretilmiş)."""
+    from pathlib import Path
+    p = Path(__file__).parent / "AI_EGITIM.md"
+    if p.exists():
+        try:
+            t = p.read_text(encoding="utf-8")
+            return t[:60000]
+        except Exception:
+            return None
+    return None
+
+
+_TRAINING_PACK = _load_training_pack()
+if _TRAINING_PACK:
+    SYSTEM_PROMPT += ("\n\n=== EĞİTİM PAKETİ (GERÇEK VERİLERDEN ÜRETİLDİ — AI_EGITIM.md) ===\n"
+                      + _TRAINING_PACK + "\n=== EĞİTİM PAKETİ SONU ===")
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +230,11 @@ async def self_check():
         data3 = r3.data if isinstance(r3.data, str) else json.dumps(r3.data, ensure_ascii=False)
         assert "YÜKSEK" in data3
         print(f"  ✅ Ban-riski uyarı sistemi çalışıyor: yüksek riskli kod → YÜKSEK + 'BAN RİSKİ'")
+        if _TRAINING_PACK:
+            print(f"  ✅ AI eğitim paketi yüklü (AI_EGITIM.md, {len(_TRAINING_PACK):,} karakter) — "
+                  "AI gerçek fonksiyon/ID bilgisiyle başlar")
+        else:
+            print("  ℹ️  AI eğitim paketi yok — üretmek için: python scripts/gen_training_pack.py")
         import bridge as B
         st = B.status()
         if st.get("configured"):
@@ -314,6 +341,14 @@ def main():
                 if user == "/tools":
                     tools = await client.list_tools()
                     print("🔧", ", ".join(t.name for t in tools))
+                    continue
+                if user == "/egitim":
+                    if _TRAINING_PACK:
+                        print(f"  🎓 Eğitim paketi YÜKLÜ (AI_EGITIM.md, {len(_TRAINING_PACK):,} karakter) — "
+                              "AI gerçek API + item ID bilgisiyle konuşuyor")
+                    else:
+                        print("  ⚠️ Eğitim paketi YÜKLÜ DEĞİL — üret: python scripts/gen_training_pack.py "
+                              "(sonra chat.py'yi yeniden başlat)")
                     continue
                 if user == "/temizle":
                     history[:] = [{"role": "system", "content": SYSTEM_PROMPT}]

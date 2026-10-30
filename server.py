@@ -21,15 +21,18 @@ Filigran: mr_berk
 """
 import json
 import os
+import re
+import time
 from typing import Optional
 
 from fastmcp import FastMCP
 
 import knowledge as K
 import bridge as B
+import autotest as AT
 
 WATERMARK = "mr_berk"
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 mcp = FastMCP(
     f"GENTAHAX MCP — {WATERMARK} edition",
@@ -42,7 +45,10 @@ mcp = FastMCP(
         "Kural 4: Eşya ID sorularında GERÇEK 6832 esyalik veritabanı (gh_item_db_search / gh_item_db_info) "
         "+ oyunun canlı items.dat doğrulaması (getItemByName) birlikte kullan. "
         "Kural 5: 'Dünyada kaç tane X var?' gibi canlı sorularda gh_world_count_item kullan — "
-        "sadece okuma yapar, gerçek sayıyı döner, ban riski yoktur."
+        "sadece okuma yapar, gerçek sayıyı döner, ban riski yoktur. "
+        "Kural 6: Hazır mod isteklerinde ('mod fly aç/kapat') gh_cheat_set kullan — script yazma. "
+        "Kural 7: 'yaz/çalıştır ve çalışıyor mu bak' isteklerinde gh_auto_test kullan; dönen "
+        "kullaniciya_soz alanını kullanıcıya aynen söyle, HATA'da önerilen yamayla tekrar dene."
     ),
 )
 
@@ -658,6 +664,7 @@ end
 -- FAZ B — kirma thread'i (uzun surer; ilerleme ve sonuc lua_logs.txt'ye duser)
 runThread(function()
     local broken = 0
+    doLog(string.format('AUTOTEST|START|farm_{ID}|hedef:%d', #targets))
     for _, p in ipairs(targets) do
         local t = checkTile(p.x, p.y)
         if t and t.fg == TARGET then
@@ -674,6 +681,7 @@ runThread(function()
     sleep(4000)  -- gem'ler sunucudan birkaç saniye icinde duser
     local me2 = getLocal()
     local gems_after = (me2 and me2.gems) or gems_before
+    doLog(string.format('AUTOTEST|OK|farm_{ID}|kirilan:%d|gems_kazanc:%d', broken, gems_after - gems_before))
     doLog(string.format('FARM_RESULT|WORLD:%s|TARGET:%d|NAME:%s|FOUND:%d|BROKEN:%d|GEMS_BEFORE:%d|GEMS_AFTER:%d|GEMS_GAINED:%d',
         tostring(w.name), TARGET, NAME, #targets, broken, gems_before, gems_after, gems_after - gems_before))
     logToConsole('[mr_berk farm] tamam — rapor lua_logs.txt icinde (gh_logs_read ile oku)')
@@ -940,6 +948,531 @@ def gh_learn_lua_gentahax(topic: str = "start") -> str:
         ),
     }
     return guides.get(topic, "topic: start | hooks | packets | cheats | imgui | threads | farming")
+
+
+# ===========================================================================
+# BÖLÜM 6 — HAZIR MOD KONTROLÜ · OTOMATİK TEST DÖNGÜSÜ · APK UYUMU (v1.5.0)
+# ===========================================================================
+
+def _resolve_cheat(query):
+    """Cheat adını/kodunu DLL doğrulamalı CheatCode enum'undan çözer.
+    Belirsizse adayları döndürür — ASLA tahmin etmez."""
+    e = K.get_enums()["CheatCode"]
+    q = str(query).strip().lower()
+    if q.isdigit():
+        if q in e:
+            return {"resolved": True, "code": int(q), "label": e[q]}
+        return {"resolved": False, "reason": "not_found", "candidates": []}
+
+    def _norm(s):
+        return s.lower().replace(" ", "").replace("_", "").replace("-", "")
+
+    exact = [(int(k), v) for k, v in e.items() if v.lower() == q or _norm(v) == _norm(q)]
+    if len(exact) == 1:
+        return {"resolved": True, "code": exact[0][0], "label": exact[0][1]}
+    if len(exact) > 1:
+        return {"resolved": False, "reason": "ambiguous",
+                "candidates": sorted([{"kod": c, "mod": v} for c, v in exact], key=lambda x: x["kod"])}
+    subs = [(int(k), v) for k, v in e.items() if q in v.lower()]
+    if len(subs) == 1:
+        return {"resolved": True, "code": subs[0][0], "label": subs[0][1]}
+    if len(subs) > 1:
+        return {"resolved": False, "reason": "ambiguous",
+                "candidates": sorted([{"kod": c, "mod": v} for c, v in subs], key=lambda x: x["kod"])}
+    close = AT.closest_function(q, list(e.values()))
+    if close:
+        return {"resolved": False, "reason": "did_you_mean", "suggestion": close[0]}
+    return {"resolved": False, "reason": "not_found", "candidates": []}
+
+
+_GORSEL_MODLAR = {"night vision", "show door label", "show sign label", "can see ghost"}
+
+
+@mcp.tool
+def gh_cheat_set(cheat: str, state: Optional[bool] = None) -> str:
+    """⭐ HAZIR MOD AÇ/KAPAT — 'mod fly aç' gibi istekler için. GENTAHAX'ta zaten VAR OLAN
+    32 hazır modu (Mod Fly, Ghost Mode, No Clip, Night Vision, Anti Gravity...) AI ile
+    kontrol eder: toggleCheat uygular, getCheat ile DOĞRULAR. cheat: mod adı ('Mod Fly',
+    'modfly', 'fly') veya kodu ('26'). state: True=aç, False=kapat, None=sadece durumu oku."""
+    res = _resolve_cheat(cheat)
+    if not res.get("resolved"):
+        out = {"istek": cheat, "uygulandi": False, "watermark": WATERMARK}
+        if res.get("reason") == "ambiguous":
+            out["hata"] = "Birden fazla mod eşleşiyor — hangisini kastettin?"
+            out["adaylar"] = res["candidates"]
+        elif res.get("reason") == "did_you_mean":
+            out["not"] = (f"'{res['suggestion']}' modunu mu demek istedin? "
+                          "Tam adıyla tekrar çağır (ör. gh_cheat_set('{res['suggestion']}', true)).")
+        else:
+            out["hata"] = f"'{cheat}' DLL doğrulamalı 32 mod listesinde yok."
+            out["ipucu"] = "Tam liste: gh_cheats_list — doğru adı oradan al"
+        return json.dumps(out, ensure_ascii=False, indent=2)
+    code, label = res["code"], res["label"]
+    st, hint = _bridge_or_hint()
+    if hint:
+        return hint
+    try:
+        if state is None:
+            r = B.exec_lua(f"return tostring(getCheat({code}))", timeout=8)
+            acik = "true" in str(r).lower()
+            return json.dumps({
+                "mod": label, "kod": code, "durum": "AÇIK" if acik else "KAPALI",
+                "dogrulama_kaynagi": f"getCheat({code}) → {str(r).strip()}",
+                "not": "state=true/false vererek açıp kapatabilirsin",
+                "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+        lua = (f"toggleCheat({code}, {'true' if state else 'false'}) "
+               f"sleep(150) return tostring(getCheat({code}))")
+        r = B.exec_lua(lua, timeout=8)
+        dogrulandi = ("true" in str(r).lower()) == bool(state)
+        return json.dumps({
+            "mod": label, "kod": code,
+            "istenen": "AÇ" if state else "KAPAT",
+            "sonuc": ("AÇIK ✓ — getCheat doğruladı" if (dogrulandi and state)
+                      else "KAPALI ✓ — getCheat doğruladı" if dogrulandi
+                      else f"⚠️ UYGULANAMADI — getCheat '{str(r).strip()}' döndü; oyun menüsünden elle dene"),
+            "dogrulandi": dogrulandi,
+            "ban_notu": ("toggleCheat istemci RAM yamasıdır (paket göndermez) AMA davranışın "
+                         "dünyada GÖRÜNÜR — kalabalık dünyada uzun süre açık bırakma!"
+                         if state and label.lower() not in _GORSEL_MODLAR
+                         else "Görsel/bilgi modu — görünür davranış değişikliği düşük, ban riski düşük"),
+            "diger": f"Durum tablosu: gh_cheat_status · bellek yaması alternatifi: patchMemoryByName('{label}')",
+            "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({"mod": label, "kod": code, "hata": str(e),
+                           "ipucu": "gentahax_bridge.lua oyunda açık mı? gh_device_status"},
+                          ensure_ascii=False)
+
+
+@mcp.tool
+def gh_cheat_status() -> str:
+    """TÜM hazır modların (32 CheatCode) anlık AÇIK/KAPALI durum tablosu — tek köprü
+    çağrısında hepsi. 'Hangi modlar açık?' sorusunun GERÇEK cevabı (getCheat ile)."""
+    st, hint = _bridge_or_hint()
+    if hint:
+        return hint
+    e = K.get_enums()["CheatCode"]
+    codes = sorted(int(k) for k in e)
+    arr = "{" + ",".join(str(c) for c in codes) + "}"
+    lua = ("local out = {}\n"
+           f"for _, c in ipairs({arr}) do out[#out + 1] = c .. '=' .. tostring(getCheat(c)) end\n"
+           "return table.concat(out, '|')")
+    try:
+        r = B.exec_lua(lua, timeout=12)
+        durum = {}
+        for kv in str(r).split("|"):
+            if "=" in kv:
+                k, v = kv.split("=", 1)
+                try:
+                    durum[int(k)] = (v.lower() == "true")
+                except ValueError:
+                    pass
+        tbl = [{"kod": c, "mod": e[str(c)], "durum": ("AÇIK" if durum.get(c) else "KAPALI")}
+               for c in codes if c in durum]
+        acik = [t["mod"] for t in tbl if t["durum"] == "AÇIK"]
+        return json.dumps({
+            "istek": "Hangi hazır modlar açık?",
+            "toplam_mod": len(codes), "okunabildi": len(tbl),
+            "acik_olanlar": acik if acik else "(hiçbiri açık değil)",
+            "tablo": tbl,
+            "kapatma": "gh_cheat_set('<mod adı>', false)",
+            "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+    except Exception as ex:
+        return json.dumps({"hata": str(ex), "ipucu": "gh_device_status ile köprüyü kontrol et"},
+                          ensure_ascii=False)
+
+
+# ------------------------- OTOMATİK TEST DÖNGÜSÜ ----------------------------
+
+def _syntax_precheck(code):
+    """Söz dizimi ön-kontrolü: kodu SADECE DERLER (load) — ASLA ÇALIŞTIRMAZ.
+    Oyun içi fonksiyonlar (getLocal, toggleCheat...) DERLEMEYE takılmaz; yalnız gerçek
+    gramer hatası (eksik 'end', parantez) yakalanır. Oyun fonksiyonlarının varlığına
+    dair TEK yetkili kaynak GENTAHAX executor'ıdır — bu kontrol asla 'fonksiyon yok'
+    HATASI ÜRETMEZ. Dönen: {'sonuc': 'geçti'|'hata'|'atıldı', 'detay': str}"""
+    try:
+        import lupa
+    except ImportError:
+        return {"sonuc": "atıldı", "detay": "lupa kurulu değil — atlandı (zaten oyun executor'ı derleyecek)"}
+    try:
+        lr = lupa.LuaRuntime()
+        lr.globals()["__mcp_code"] = code
+        lr.execute("__mcp_f, __mcp_e = load(__mcp_code)")
+        ok = bool(lr.eval("__mcp_f ~= nil"))
+        err = str(lr.eval("tostring(__mcp_e)"))
+        if ok:
+            return {"sonuc": "geçti", "detay": "derleme OK — kod ÇALIŞTIRILMADI, oyun fonksiyonları false hata vermez"}
+        return {"sonuc": "hata", "detay": err[:300] if err and err != "nil" else "söz dizimi hatası"}
+    except Exception as e:
+        return {"sonuc": "atıldı", "detay": f"ön-kontrol atlandı: {e}"}
+
+
+@mcp.tool
+def gh_auto_test(script: str, watch: int = 20, force: bool = False) -> str:
+    """⭐⭐ OTOMATİK TEST DÖNGÜSÜ — 'scripti ÇALIŞTIR, loglarına bak, çalışıyor mu söyle':
+    scripti GENTAHAX'ın KENDİ Lua executor'ında çalıştırır, lua_logs.txt'yi izler ve
+    ÇALIŞIYOR / DEVAM_EDIYOR / HATA kararını YALNIZCA executor dönüşüne + loglara göre verir.
+    Hata varsa sınıflandırır + çözüm önerir + yanlış fonksiyon adıysa YAMALI script üretir
+    (yamayı geri verirsin → döngü kapanır). Söz dizimi ön-kontrolü sadece DERLER
+    (çalıştırmaz) — oyun içi fonksiyonlar bundan false hata VERMEZ. Yüksek riskli kod
+    force=false iken çalıştırılmaz (⚠️ BUNDA BAN RİSKİ VAR uyarısı döner)."""
+    watch = max(3, min(int(watch), 90))
+    analysis = K.analyze_code(script)
+    if analysis["risk_level"] == "high" and not force:
+        return json.dumps({
+            "sonuc": "REDDEDİLDİ", "calistirildi": False,
+            "uyari": analysis["high_risk_banner"],
+            "risk_seviyesi": f"{analysis['risk_label_tr']} ({analysis['risk_score']}/100)",
+            "ne_yapmali": "Riskli kısmı düzelt (sleep ekle, döngüyü sınırla) ya da force=true ile riski kabul et.",
+            "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+    pre = _syntax_precheck(script)
+    if pre["sonuc"] == "hata":
+        return json.dumps({
+            "sonuc": "HATA", "calistirildi": False,
+            "sozdizimi_on_kontrol": pre,
+            "hata": {"sinif": "SYNTAX", "satir": pre["detay"], "hedef": None,
+                     "aciklama": "Kod derlenmedi — executor'a gönderilmedi bile"},
+            "cozum": AT.suggest_fix({"sinif": "SYNTAX", "satir": pre["detay"]}),
+            "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+    st, hint = _bridge_or_hint()
+    if hint:
+        return json.dumps({"sonuc": "CIHAZ_YOK", "calistirildi": False,
+                           "sozdizimi_on_kontrol": pre,
+                           "ipucu": "Canlı test için köprü gerekli — " + str(hint)[:200],
+                           "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+    try:
+        before = B.read_logs(400) or ""
+    except Exception:
+        before = ""
+    try:
+        sync = str(B.exec_lua(script.strip(), timeout=25, risk_level=analysis["risk_level"]))
+        exec_err = None
+    except Exception as e:
+        sync, exec_err = str(e), str(e)
+    sync_text = sync if exec_err is None else f"Lua hatası: {sync}"
+
+    def _logs_now():
+        try:
+            return B.read_logs(400) or ""
+        except Exception:
+            return before
+    new_lines = AT.new_log_lines(before, _logs_now())
+    verdict = AT.parse_execution(sync_text, new_lines)
+    t0 = time.time()
+    while verdict["sonuc"] == "DEVAM_EDIYOR" and (time.time() - t0) < watch:
+        time.sleep(2)
+        new_lines = AT.new_log_lines(before, _logs_now())
+        verdict = AT.parse_execution(sync_text, new_lines)
+
+    api_names = K.api_names("android") + K.api_names("windows")
+    hata = verdict.get("hata")
+    fix = AT.suggest_fix(hata, api_names) if hata else None
+    yama = None
+    if hata and hata.get("sinif") == "MISSING_FN" and hata.get("hedef"):
+        adaylar = AT.closest_function(hata["hedef"], api_names)
+        if len(adaylar) == 1:
+            patched, n = AT.patch_missing_fn(script, hata["hedef"], adaylar[0])
+            if n > 0:
+                yama = {"eski_fonksiyon": hata["hedef"], "yeni_fonksiyon": adaylar[0],
+                        "degisiklik_sayisi": n, "script": patched}
+    sonuc = verdict["sonuc"]
+    if sonuc == "CALISIYOR":
+        soz = "✅ Script ÇALIŞIYOR — " + (verdict["kanit"][0][:160] if verdict["kanit"] else "hatasız tamamlandı")
+    elif sonuc == "DEVAM_EDIYOR":
+        soz = ("⏳ Script çalışıyor, hâlâ devam ediyor — ilerlemesi kanıt satırlarında; "
+               "bir süre sonra gh_logs_read ile nihai sonucu oku")
+    elif sonuc == "CIHAZ_YOK":
+        soz = "❌ Köprü/cihaz yanıt vermiyor — gentahax_bridge.lua'yi oyunda çalıştır, tekrar dene"
+    else:
+        soz = "❌ Script HATA verdi — " + (fix["teshis"][:160] if fix else "loglara bak")
+    return json.dumps({
+        "sonuc": sonuc,
+        "kullaniciya_soz": soz,
+        "kanit": verdict["kanit"],
+        "sozdizimi_on_kontrol": pre,
+        "risk_seviyesi": f"{analysis['risk_label_tr']} ({analysis['risk_score']}/100)",
+        "hata": hata,
+        "cozum": fix,
+        "yama": yama,
+        "yama_kullanimi": ("yama.script'i gh_auto_test'e geri ver → düzeltilmiş hâl tekrar test edilir "
+                           "(AI böylece döngüyü kapatır)" if yama else
+                           ("Hata düzeltildikten sonra gh_auto_test ile tekrar çağır" if hata else None)),
+        "izlenen_sure_sn": round(time.time() - t0, 1),
+        "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+
+
+# ------------------------------ APK UYUM TESTİ -------------------------------
+
+@mcp.tool
+def gh_compat_check() -> str:
+    """⭐ APK GÜNCELLEMESİ sonrası uyumluluk testi: 'GENTAHAX yeni sürüme güncellendi,
+    MCP bozuldu mu?' 57 Android + 18 Windows API fonksiyonunu CANLI oyunda tek tek
+    yoklar (type(_G['x']) == 'function'), eksikleri ve etkilenen şablonları listeler.
+    Köprü kapalıysa offline kontrol listesi + GUNCELLEME.md senaryolarını döner.
+    Karar: TAM UYUMLU / KISMİ / KÖPRÜ KIRIK."""
+    android_names = K.api_names("android")
+    windows_names = K.api_names("windows")
+    db_bilgi = {
+        "analiz_edilen_surum": "GENTAHAX v5.61 (GTInternal.dll, MD5 8f95ed4449dc4893f51d5380e31f8055)",
+        "bilinen_android_fonksiyon": len(android_names),
+        "bilinen_windows_fonksiyon": len(windows_names),
+        "item_veritabani": f"{K.items_count()} eşya — APK'dan BAĞIMSIZ (Growtopia items.dat kaynaklı, güncellenmezse de eski sürümle çalışır)",
+    }
+
+    def _probe_lua(names):
+        arr = "{" + ",".join(f"'{n}'" for n in names) + "}"
+        return ("local names = " + arr + "\n"
+                "local okn, miss = 0, {}\n"
+                "for _, n in ipairs(names) do\n"
+                "  if type(_G[n]) == 'function' then okn = okn + 1 else miss[#miss + 1] = n end\n"
+                "end\n"
+                "return 'OK:' .. okn .. '|MISSING:' .. table.concat(miss, ',')")
+
+    def _parse(s):
+        ok_n, missing = 0, []
+        for part in str(s).split("|"):
+            if part.startswith("OK:"):
+                try:
+                    ok_n = int(part[3:] or 0)
+                except ValueError:
+                    ok_n = 0
+            if part.startswith("MISSING:"):
+                missing = [m for m in part[8:].split(",") if m]
+        return ok_n, missing
+
+    st, hint = _bridge_or_hint()
+    if hint:
+        return json.dumps({
+            "sonuc": "OFFLINE — köprü kapalı, canlı yoklama yapılamadı",
+            "bilgi_tabani": db_bilgi,
+            "apk_guncellemesi_olursa_3_senaryo": [
+                {"senaryo": "A — Küçük güncelleme, Lua API aynı", "olasılık": "en sık",
+                 "ne_olur": "Her şey çalışmaya devam eder", "kontrol": "gh_device_status → PONG geliyorsa OK"},
+                {"senaryo": "B — Bazı fonksiyonlar değişti",
+                 "ne_olur": "O fonksiyonu kullanan şablonlar hata verir; geri kalanı çalışır",
+                 "kontrol": "köprüyü kurup bu aracı (gh_compat_check) tekrar çağır — eksikler listelenir"},
+                {"senaryo": "C — Köprü mekanizması kırıldı",
+                 "ne_olur": "Scriptler cihaza ulaşamaz (PONG gelmez)",
+                 "ne_yapilir": "Yeni APK yeniden analiz edilip data/api_*.json güncellenir (dosya takası)"},
+            ],
+            "mimarlik": "MCP bilgisi kodda gömülü DEĞİL — data/*.json düz dosyalarında; "
+                        "APK değişse bile uyum veri dosyası yenilenerek sağlanır",
+            "detayli_rehber": "GUNCELLEME.md (repo kökünde)",
+            "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+    try:
+        ra = str(B.exec_lua(_probe_lua(android_names), timeout=15))
+    except Exception as e:
+        return json.dumps({
+            "sonuc": "KÖPRÜ KIRIK (Senaryo C)",
+            "bilgi_tabani": db_bilgi,
+            "hata": str(e)[:200],
+            "teshis": "Köprü dosyaları yapılandırılmış ama oyundan yanıt gelmiyor — "
+                      "APK güncellemesi köprü mekanizmasını kırmış VEYA bridge script oyunda çalışmıyor",
+            "ne_yapmali": ["1) gh_device_status → detaya bak",
+                           "2) gh_bridge_deploy + oyunda gentahax_bridge.lua'yı yeniden Execute et",
+                           "3) Hâlâ yoksa: yeni APK yeniden analiz edilmeli (data/api_*.json güncellenir) — GUNCELLEME.md Senaryo C"],
+            "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+    a_ok, a_miss = _parse(ra)
+    w_ok, w_miss = 0, []
+    try:
+        rw = str(B.exec_lua(_probe_lua(windows_names), timeout=15))
+        w_ok, w_miss = _parse(rw)
+    except Exception:
+        w_ok, w_miss = 0, []
+    client = "ANDROID" if (len(android_names) - a_ok) <= (len(windows_names) - w_ok) else "WINDOWS"
+    missing = a_miss if client == "ANDROID" else w_miss
+    ok_count = a_ok if client == "ANDROID" else w_ok
+    total = len(android_names) if client == "ANDROID" else len(windows_names)
+    affected = []
+    if missing:
+        codes = [K.template_get(t["id"]).get("code", "") or "" for t in K.template_list()]
+        codes.append(_FARM_LUA)
+        labels = [t["id"] for t in K.template_list()] + ["gh_farm_script_gen (ad-hoc üretici)"]
+        for fn in missing:
+            for lbl, c in zip(labels, codes):
+                if fn + "(" in c:
+                    affected.append({"etkilenen": lbl, "fonksiyon": fn})
+    if not missing:
+        verdict = "TAM UYUMLU — APK güncellemesi MCP'yi etkilememiş, tüm araçlar çalışıyor"
+    else:
+        verdict = (f"KISMİ UYUM — {len(missing)}/{total} fonksiyon bu sürümde yok; "
+                   "etkilenenler listelendi, kalan her şey çalışır")
+    return json.dumps({
+        "sonuc": verdict,
+        "bagli_istemci": client,
+        "canli_yoklama": {"bulunan": ok_count, "toplam": total, "eksikler": missing},
+        "bilgi_tabani": db_bilgi,
+        "etkilenen_sablonlar": affected if affected else "(hiçbir şablon etkilenmedi)",
+        "ne_yapmali": (["Eksik fonksiyonları kullanan şablonları kullanma",
+                        "data/api_android.json + api_windows.json dosyalarını yeni sürüme göre güncelle "
+                        "(düz JSON dosyası — kod değişikliği gerekmez)",
+                        "Detay: GUNCELLEME.md Senaryo B"] if missing else
+                       ["Hiçbir şey yapmana gerek yok — her şey yolunda", "Periyodik kontrol: APK güncellemesi sonrası bu aracı tekrar çağır"]),
+        "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+
+
+# ------------------------- GENEL AMAÇLI SCRIPT ÜRETİCİ -----------------------
+
+_PLACE_LUA = """-- mr_berk GENTAHAX — hedef: {GOAL}
+-- Kalip: place (blok dose) | Uretici: gh_script_gen v1.5.0
+-- Esya: {NAME} (ID {ID}) — GERCEK items.dat veritabanindan cozuldu
+-- RISK: ORTA — dongude tile_change paketi; rastgele insan benzeri delay eklendi
+-- Durdurma: killThread('gh_place')
+local w = getWorld()
+if not w then return 'ERR|NO_WORLD' end
+local me = getLocal()
+if not me then return 'ERR|NO_LOCAL' end
+local TARGET = {ID}
+local N = {COUNT}
+pcall(function() math.randomseed(os.time()) end)
+runThread(function()
+    doLog(string.format('AUTOTEST|START|place|hedef:%d adet %s', N, '{NAME}'))
+    local koyulan = 0
+    local cx = math.floor(me.pos.x)
+    local cy = math.floor(me.pos.y)
+    for dy = -1, 2 do
+        for dx = -3, 3 do
+            if koyulan >= N then break end
+            local t = checkTile(cx + dx, cy + dy)
+            if t and (t.fg == 0 or t.fg == nil) then
+                requestTileChange(cx + dx, cy + dy, TARGET)
+                koyulan = koyulan + 1
+                sleep(math.random(250, 700))
+            end
+        end
+    end
+    doLog(string.format('AUTOTEST|OK|place|koyulan:%d', koyulan))
+    logToConsole('mr_berk] place tamam')
+end, 'gh_place')
+return 'QUEUED|place|esya:{NAME}|adet:' .. N
+"""
+
+_SCRIPT_PATTERNS = {
+    "farm":    ("kır", "kir", "farm", "punch", "break", "smash", "kes", "kess"),
+    "collect": ("topla", "collect", "yerdeki", "düşen", "dusen", "çek", "cek", "pickup"),
+    "place":   ("koy", "koyul", "place", "döşe", "dose", "yerleştir", "yerlestir", "blok at"),
+    "chat":    ("sohbet", "chat", "konuş", "konus", "cevap", "yanıt", "yanit", "mesaj", "insan gibi"),
+    "monitor": ("izle", "monitor", "logla", "kaydet", "rapor", "dinle", "logger", "log tut"),
+    "ui":      ("panel", "menü", "menu", "imgui", "arayüz", "arayuz", "overlay", "esp", "gui"),
+}
+
+
+def _guess_item(goal):
+    """Hedef metninden eşya adı çıkarmaya çalışır (Türkçe eklerini soyarak: 'pepperları'→'pepper').
+    Dönen: (resolve_sözlüğü|None, denenmiş_adaylar). ASLA tahmin etmez — sadece GERÇEK
+    veritabanından kesin çözülen adı döndürür."""
+    words = re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü]{2,}", goal)
+    stop = {"dünyadaki", "dünyada", "dünya", "tüm", "tum", "hepsini", "ve", "bana", "bir", "adet",
+            "kır", "kir", "farm", "yap", "olsun", "script", "yaz", "modunu", "modu",
+            "topla", "koy", "yerdeki", "düşen", "dusen", "sohbeti", "sohbet",
+            # ödül/rapor kelimeleri — farm HEDEFİ değil, sonucu:
+            "gems", "gem", "kazanç", "kazanc", "söyle", "soyle", "göster", "goster",
+            "rapor", "bak", "bakalım", "kaç", "kac", "ne", "kadar", "toplam", "çıkan", "cikan"}
+    tried = []
+    spans = []
+    for n in (3, 2, 1):
+        for i in range(0, max(0, len(words) - n + 1)):
+            spans.append(" ".join(words[i:i + n]))
+    for cand in spans:
+        if cand.lower() in stop or len(cand) < 3:
+            continue
+        tried.append(cand)
+        r = K.item_resolve(cand)
+        if r.get("resolved"):
+            return r, tried
+    for w in words:
+        if w.lower() in stop:
+            continue
+        for cut in range(1, 6):
+            stem = w[:-cut] if len(w) - cut >= 3 else None
+            if not stem:
+                break
+            tried.append(stem)
+            r = K.item_resolve(stem)
+            if r.get("resolved"):
+                return r, tried
+    return None, tried
+
+
+@mcp.tool
+def gh_script_gen(goal: str) -> str:
+    """⭐⭐ GENEL SCRIPT ÜRETİCİ — şablon dışı HER hedef için: 'pepperları kır',
+    'yerdeki eşyaları topla', 'sohbeti dinle', 'etrafıma dirt koy', 'mod paneli yap'...
+    Doğal dildeki hedefi kalıba ayırır (farm | collect | place | chat | monitor | ui),
+    eşyayı GERÇEK 6832'lik veritabanından çözer (çözülemezse ASLA tahmin etmez, sorar),
+    scripti YALNIZ GERÇEK API fonksiyonlarıyla kurar, gerçek Lua motorunda DERLER,
+    ban riskini analiz eder. Üretilen script AUTOTEST işaretlidir → gh_auto_test ile
+    'çalıştır + logları izle + ÇALIŞIYOR/HATA söyle' döngüsü hazırdır."""
+    g = str(goal).lower()
+    kalip = None
+    for k in ("farm", "collect", "place", "chat", "monitor", "ui"):
+        if any(w in g for w in _SCRIPT_PATTERNS[k]):
+            kalip = k
+            break
+    if kalip is None:
+        return json.dumps({
+            "istek": goal,
+            "hata": "Hedef tanımadım — hangi kalıp?",
+            "kaliplar": {"farm": "'pepperları kır' (blok kırma + gems raporu)",
+                         "collect": "'yerdeki eşyaları topla' (otomatik toplama)",
+                         "place": "'etrafıma dirt koy' (blok döşeme)",
+                         "chat": "'sohbeti dinle / gelenlere cevap ver'",
+                         "monitor": "'dünya olaylarını izle ve logla'",
+                         "ui": "'menü paneli yap' (ImGui)"},
+            "ipucu": "Örnek: gh_script_gen('dünyadaki pepperları kır')",
+            "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+
+    item = None
+    default_notu = None
+    if kalip == "farm":
+        item, tried = _guess_item(goal)
+        if not item:
+            cand = K.items_search(tried[-1], 12) if tried else []
+            return json.dumps({
+                "istek": goal, "kalip": "farm",
+                "hata": "Hangi eşyayı kırayım? — belirttiğin eşya GERÇEK veritabanından çözülemedi, tahmin ETMİYORUM",
+                "denenmiş": tried[-8:],
+                "adaylar": [{"id": c["id"], "isim": c["name"]} for c in cand[:8]],
+                "ipucu": "Tam isimle tekrar dene: gh_script_gen('dünyadaki Pepper'ları kır')",
+                "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+        code = _FARM_LUA.replace("{ID}", str(item["id"])).replace("{NAME}", item["name"]).strip()
+        durdurma = f"killThread('farm_{item['id']}')"
+        aciklama = f"{item['name']} (ID {item['id']}) bloklarını tara → kır → gems raporu"
+    elif kalip == "place":
+        item, tried = _guess_item(goal)
+        if not item:
+            item = {"id": 2, "name": "Dirt"}
+            default_notu = "Eşya belirtilmemiş → Dirt (ID 2, gerçek DB) kullanıldı — başka istersen belirt"
+        code = (_PLACE_LUA.replace("{GOAL}", goal).replace("{ID}", str(item["id"]))
+                .replace("{NAME}", item["name"]).replace("{COUNT}", "10").strip())
+        durdurma = "killThread('gh_place')"
+        aciklama = f"Etrafına {item['name']} (ID {item['id']}) döşe"
+    else:
+        tpl_map = {"collect": "auto_collect", "chat": "human_responder",
+                   "monitor": "varlist_logger", "ui": "imgui_panel"}
+        t = K.template_get(tpl_map[kalip])
+        code = (f"-- mr_berk GENTAHAX — hedef: {goal}\n"
+                f"-- Kalıp: {kalip} · doğrulanmış '{t['id']}' şablonu üzerine özelleştirildi\n"
+                + t["code"])
+        durdurma = "killAllThread() hepsini durdurur — tek tek için gh_stop_scripts"
+        aciklama = t.get("name", kalip)
+    pre = _syntax_precheck(code)
+    risk = K.analyze_code(code)
+    return json.dumps({
+        "istek": goal,
+        "tespit": {"kalip": kalip, "esya": ({"id": item["id"], "isim": item["name"]} if item else None),
+                   "aciklama": aciklama},
+        "not": default_notu,
+        "script": code,
+        "sozdizimi": pre,
+        "ban_riski": {"seviye": risk["risk_label_tr"], "puan": f"{risk['risk_score']}/100",
+                       "uyari": risk["high_risk_banner"] or ("⚠️ ORTA — bot paterni, uzun kullanımda dikkat" if risk["risk_level"] == "medium" else "Düşük")},
+        "otomatik_test": "gh_auto_test(script) → çalıştırır, lua_logs.txt'yi izler, '✅ ÇALIŞIYOR' ya da hata+yama döner",
+        "kullanim": ["1) Bu scripti gh_auto_test'e ver (çalıştır + log izle + karar) — ÖNERİLEN",
+                     "   ya da gh_script_write('genel_script.lua', script) ile kaydet, oyunda Execute et",
+                     "2) Hata dönerse gh_auto_test'in önerdiği yamayı uygula, tekrar test et",
+                     f"3) Durdurma: {durdurma}"],
+        "durdurma": durdurma,
+        "watermark": WATERMARK}, ensure_ascii=False, indent=2)
 
 
 # ---------------------------------------------------------------------------
