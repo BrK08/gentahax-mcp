@@ -303,9 +303,12 @@ def read_logs(tail=80):
     return "\n".join(lines[-int(tail):])
 
 
+_EXEC_LOCK = threading.Lock()
+
+
 def exec_lua(code, timeout=DEFAULT_TIMEOUT, risk_level="low"):
     """
-    Lua kodunu köprü üzerinden çalıştırır ve sonucu bekler.
+    Lua kodunu köprü üzerinden çalıştırır ve sonucu bekler (thread-safe).
     risk_level: 'high' ise güvenli modda reddedilir (force ayrı ele alınır).
     """
     d = script_dir()
@@ -319,35 +322,36 @@ def exec_lua(code, timeout=DEFAULT_TIMEOUT, risk_level="low"):
 
     start_http_relay(RELAY_PORT)
 
-    out_file = d / OUT_NAME
-    in_file = d / IN_NAME
-    if out_file.exists():
-        out_file.unlink()
+    with _EXEC_LOCK:
+        out_file = d / OUT_NAME
+        in_file = d / IN_NAME
+        if out_file.exists():
+            out_file.unlink()
 
-    cmd_id = secrets.token_hex(4)
-    payload = f"{cmd_id}|EXEC\n{code}"
-    in_file.write_text(payload, encoding="utf-8", newline="\n")
+        cmd_id = secrets.token_hex(4)
+        payload = f"{cmd_id}|EXEC\n{code}"
+        in_file.write_text(payload, encoding="utf-8", newline="\n")
 
-    if adb_enabled():
-        _push(in_file, f"{_remote_dir()}/{IN_NAME}")
-
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        time.sleep(0.25)
-        local_out = out_file
         if adb_enabled():
-            try:
-                _pull(f"{_remote_dir()}/{OUT_NAME}", out_file)
-            except Exception:
-                continue
-        if local_out.exists():
-            for line in local_out.read_text(encoding="utf-8", errors="replace").splitlines():
-                if line.startswith(f"{cmd_id}|"):
-                    _, st_code, rest = line.split("|", 2)
-                    if st_code == "OK":
-                        return rest if rest else "(dönüş değeri yok)"
-                    raise RuntimeError(f"Lua hatası: {rest}")
-    raise TimeoutError(f"Köprü zaman aşımı ({timeout}s) — gentahax_bridge.lua oyunda çalışıyor mu? gh_device_status ile kontrol edin.")
+            _push(in_file, f"{_remote_dir()}/{IN_NAME}")
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            time.sleep(0.25)
+            local_out = out_file
+            if adb_enabled():
+                try:
+                    _pull(f"{_remote_dir()}/{OUT_NAME}", out_file)
+                except Exception:
+                    continue
+            if local_out.exists():
+                for line in local_out.read_text(encoding="utf-8", errors="replace").splitlines():
+                    if line.startswith(f"{cmd_id}|"):
+                        _, st_code, rest = line.split("|", 2)
+                        if st_code == "OK":
+                            return rest if rest else "(dönüş değeri yok)"
+                        raise RuntimeError(f"Lua hatası: {rest}")
+        raise TimeoutError(f"Köprü zaman aşımı ({timeout}s) — gentahax_bridge.lua oyunda çalışıyor mu? gh_device_status ile kontrol edin.")
 
 
 def deploy_bridge():

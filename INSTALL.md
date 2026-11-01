@@ -191,9 +191,9 @@ python chat.py --ask "how many dirt blocks are in my world?"
 |---|---|---|
 | `deepseek` | platform.deepseek.com | one of the cheapest |
 | `gemini` | aistudio.google.com | **free** key |
-| `glm` | bigmodel.cn | glm-4-flash free tier |
+| `glm` | bigmodel.cn | glm-4.5-flash free tier |
 | `openrouter` | openrouter.ai | 300+ models, one key |
-| `ollama` | **NO KEY** | ollama.com → `ollama pull llama3.1` — fully local |
+| `ollama` | **NO KEY** | ollama.com → `ollama pull qwen3:8b` (or `llama3.3`) — fully local |
 | `lmstudio` | **NO KEY** | lmstudio.ai → Developer → start server |
 | `custom` | your endpoint | any OpenAI-compatible service via `--base-url` + `--model` |
 

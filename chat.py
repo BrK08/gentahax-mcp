@@ -13,7 +13,7 @@ KULLANIM:
   python chat.py --list-ai                       # desteklenen AI'leri listele
   python chat.py --check                         # MCP tarafını anahtarsız self-test et
   python chat.py --provider openai  --ask "dirt kaç numara?"
-  python chat.py --provider ollama  --model llama3.1   # ücretsiz lokal AI, interaktif
+  python chat.py --provider ollama  --model qwen3:8b   # ücretsiz lokal AI, interaktif
   python chat.py --ask "dünyada kaç tane dirt var?"    # env'den ayarları okur
 
 ANAHTARLAR (ortam değişkeni ya da --api-key):
@@ -43,37 +43,37 @@ MAX_RESULT_CHARS = 4000  # araç sonucundan modele gidecek maksimum uzunluk
 # ---------------------------------------------------------------------------
 PROVIDERS = {
     "openai":    {"base": "https://api.openai.com/v1",
-                  "model": "gpt-4o-mini",
+                  "model": "gpt-4.1-mini",
                   "key_env": "OPENAI_API_KEY",
-                  "hint": "platform.openai.com'dan anahtar"},
+                  "hint": "platform.openai.com'dan anahtar (gpt-4.1 / gpt-4.1-mini / gpt-5 / o4-mini)"},
     "deepseek":  {"base": "https://api.deepseek.com/v1",
                   "model": "deepseek-chat",
                   "key_env": "DEEPSEEK_API_KEY",
-                  "hint": "platform.deepseek.com (çok ucuz)"},
+                  "hint": "platform.deepseek.com (DeepSeek V3.2 / deepseek-reasoner R1 — çok ucuz)"},
     "glm":       {"base": "https://open.bigmodel.cn/api/paas/v4",
-                  "model": "glm-4-flash",
+                  "model": "glm-4.5-flash",
                   "key_env": "GLM_API_KEY",
-                  "hint": "Z.ai / bigmodel.cn — glm-4-flash ÜCRETSİZ katmanı var"},
+                  "hint": "Z.ai / bigmodel.cn — glm-4.5-flash ÜCRETSİZ katman (glm-4.5 / glm-4-plus destekli)"},
     "gemini":    {"base": "https://generativelanguage.googleapis.com/v1beta/openai",
-                  "model": "gemini-2.0-flash",
+                  "model": "gemini-2.5-flash",
                   "key_env": "GEMINI_API_KEY",
-                  "hint": "Google AI Studio'dan ücretsiz anahtar"},
+                  "hint": "Google AI Studio'dan ücretsiz anahtar (gemini-2.5-flash / gemini-2.5-pro)"},
     "openrouter": {"base": "https://openrouter.ai/api/v1",
-                   "model": "openai/gpt-4o-mini",
+                   "model": "google/gemini-2.5-flash",
                    "key_env": "OPENROUTER_API_KEY",
                    "hint": "tek anahtarla 300+ model"},
     "qwen":      {"base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                  "model": "qwen-plus",
+                  "model": "qwen3-max",
                   "key_env": "DASHSCOPE_API_KEY",
                   "hint": "Alibaba Cloud DashScope"},
     "mistral":   {"base": "https://api.mistral.ai/v1",
-                  "model": "mistral-small-latest",
+                  "model": "mistral-medium-latest",
                   "key_env": "MISTRAL_API_KEY",
                   "hint": "console.mistral.ai"},
     "ollama":    {"base": "http://localhost:11434/v1",
-                  "model": "llama3.1",
+                  "model": "qwen3:8b",
                   "key_env": None,
-                  "hint": "ÜCRETSİZ + LOKAL: ollama.com indir, 'ollama pull llama3.1'"},
+                  "hint": "ÜCRETSİZ + LOKAL: ollama.com indir, 'ollama pull qwen3:8b' (veya llama3.3)"},
     "lmstudio":  {"base": "http://localhost:1234/v1",
                   "model": "local-model",
                   "key_env": None,
@@ -100,7 +100,7 @@ KURALLAR (mutlaka uyar):
 10. VARSAYILAN IMGUI ARAYÜZÜ: Kullanıcı açıkça 'ImGui olmasın / menüsüz olsun' demedikçe, ürettiğin HER Lua scriptinde mutlaka bir ImGui kontrol paneli (`AddHook('OnRender', ..., function(dt) ImGui.Begin(...) ... ImGui.End() end)`) bulunsun!
 11. GROWTOPIA KARAKTER KURALI (TÜRKÇE KARAKTER YOK): Growtopia'nın oyun içi fontunda Türkçe karakterler (`ğ, ü, ş, ı, ö, ç, İ, Ğ, Ü, Ş, Ö, Ç`) YOKTUR ve bozuk görünür. Oyun içi string'lerde (`ImGui`, `logToConsole`, `doToast`, `sendPacket`) ASLA Türkçe karakter kullanma; mutlaka ASCII karşılıklarını (`g, u, s, i, o, c, I`) kullan! (Kullanıcıyla sohbet ederken düzgün Türkçe konuşmaya devam et.)
 12. ZORUNLU REPO İMZASI VE IMGUI WATERMARK: Ürettiğin HER Lua scriptinin en üstüne mutlaka şu açıklama satırını ekle:
-    `-- Bu berk tarafından yapılan bir repo GentaHAX-MCP reposu - > https://github.com/BrK08/gentahax-mcp`
+    `-- Made by Berk (GentaHAX-MCP repo) -> https://github.com/BrK08/gentahax-mcp`
     Ayrıca ImGui olan her şeyde, GUI'yi bozmayacak bir yere (`ImGui.End()` hemen öncesine `ImGui.Separator()` koyarak) mutlaka `ImGui.TextUnformatted('By BrK | Discord : mr_berk.')` watermark satırını ekle!
 Filigran: {WATERMARK}"""
 
