@@ -88,7 +88,16 @@ local function handle_command(content)
         return true
     elseif action == "STOP" then
         RemoveHooks()
-        killAllThread()
+        if type(getThreadsID) == "function" and type(killThread) == "function" then
+            local ok, tids = pcall(getThreadsID)
+            if ok and type(tids) == "table" then
+                for _, tid in pairs(tids) do
+                    if tostring(tid) ~= BRIDGE_ID then
+                        pcall(killThread, tid)
+                    end
+                end
+            end
+        end
         bridge_append(cmd_id .. "|OK|durduruldu")
         return true
     end
@@ -163,7 +172,7 @@ function mcp_world_item_counts(ids_csv)
     end
     local total = 0
     for _, t in pairs(getTile()) do
-        if t and t.fg ~= nil then
+        if (type(t) == "table" or type(t) == "userdata") and t.fg ~= nil then
             total = total + 1
             if want[t.fg] then want[t.fg].fg = want[t.fg].fg + 1 end
             if want[t.bg] then want[t.bg].bg = want[t.bg].bg + 1 end
@@ -183,7 +192,7 @@ function mcp_world_census()
     if not w then return "ERR|NO_WORLD" end
     local fgc, bgc, total = {}, {}, 0
     for _, t in pairs(getTile()) do
-        if t and t.fg ~= nil then
+        if (type(t) == "table" or type(t) == "userdata") and t.fg ~= nil then
             total = total + 1
             if t.fg and t.fg > 0 then fgc[t.fg] = (fgc[t.fg] or 0) + 1 end
             if t.bg and t.bg > 0 then bgc[t.bg] = (bgc[t.bg] or 0) + 1 end
