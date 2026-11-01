@@ -27,6 +27,13 @@ import threading
 import time
 from pathlib import Path
 
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
@@ -40,8 +47,8 @@ def ensure_script_dir() -> str:
         return env_dir
     detected = B.auto_detect_script_dir()
     if detected:
-        os.environ["GENTAHAX_SCRIPT_DIR"] = detected
-        return detected
+        os.environ["GENTAHAX_SCRIPT_DIR"] = str(detected)
+        return str(detected)
     local_app = os.environ.get("LOCALAPPDATA", "")
     if local_app:
         gt_dir = os.path.join(local_app, "Growtopia")

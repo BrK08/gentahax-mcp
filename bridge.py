@@ -39,16 +39,17 @@ def auto_detect_script_dir() -> Path:
     user_prof = os.environ.get("USERPROFILE", "")
     candidates = []
     if local_app:
-        candidates.append(Path(local_app) / "Growtopia" / "Script")
         candidates.append(Path(local_app) / "Growtopia" / "scripts")
+        candidates.append(Path(local_app) / "Growtopia" / "Script")
     if user_prof:
+        candidates.append(Path(user_prof) / "AppData" / "Local" / "Growtopia" / "scripts")
         candidates.append(Path(user_prof) / "AppData" / "Local" / "Growtopia" / "Script")
     for c in candidates:
         if c.exists() and c.is_dir():
             return c
-    # Growtopia klasörü varsa Script alt klasörünü otomatik oluşturabiliriz
+    # Growtopia klasörü varsa scripts alt klasörünü otomatik oluşturabiliriz
     if local_app and (Path(local_app) / "Growtopia").exists():
-        target = Path(local_app) / "Growtopia" / "Script"
+        target = Path(local_app) / "Growtopia" / "scripts"
         try:
             target.mkdir(parents=True, exist_ok=True)
             return target
@@ -266,6 +267,16 @@ def write_script(name, content, overwrite=True):
     if p.exists() and not overwrite:
         return None
     p.write_text(content, encoding="utf-8", newline="\n")
+    # Windows Growtopia dizininde hem 'scripts' hem 'Script' klasörlerine senkronize et
+    if d.parent.name.lower() == "growtopia":
+        for alt_name in ("scripts", "Script"):
+            alt_dir = d.parent / alt_name
+            if alt_dir != d:
+                try:
+                    alt_dir.mkdir(parents=True, exist_ok=True)
+                    (alt_dir / safe).write_text(content, encoding="utf-8", newline="\n")
+                except Exception:
+                    pass
     return str(p)
 
 
