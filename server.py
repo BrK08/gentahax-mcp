@@ -438,14 +438,29 @@ def gh_run_lua(code: str, force: bool = False) -> str:
 
 
 @mcp.tool
-def gh_world_snapshot() -> str:
-    """Canlı dünya anlık görüntüsü: dünya adı, boyut, oyuncu sayısı, yerdeki eşyalar, senin durumun."""
+def gh_world_snapshot(capture_screen: bool = True, render_map: bool = True, redact_private: bool = False) -> str:
+    """⭐⭐ CANLI OYUN EKRAN GÖRÜNTÜSÜ + 100x60 DÜNYA HARİTASI RENDER + ANLIK DÜNYA VERİSİ:
+    1) Growtopia penceresinin anlık PNG ekran görüntüsünü (live_game_screenshot.png) yakalar.
+    2) Tüm 100x60 (6000 tile) dünyayı getTile() ile tarayıp yüksek çözünürlüklü PNG dünya haritası (live_world_map.png) çizer.
+    3) Dünya adı, boyut, oyuncu sayısı, yerdeki eşyalar ve konum bilgisini döndürür.
+    redact_private=True verilirse dünya ve oyuncu adını görsellerde otomatik 'XXXX' olarak gizler."""
     st, hint = _bridge_or_hint()
     if hint:
         return hint
     try:
-        r = B.exec_lua("return mcp_world_snapshot()", timeout=8)
-        return json.dumps({"world": str(r), "watermark": WATERMARK}, ensure_ascii=False, indent=2)
+        r_init = "ok"
+        screen_info = B.capture_game_window_png(redact_private=redact_private) if capture_screen else None
+        map_info = B.render_live_world_map_png(redact_private=redact_private, item_resolver=K.item_by_id) if render_map else None
+        try:
+            r = B.exec_lua("return mcp_world_snapshot()", timeout=5)
+        except Exception as e:
+            r = f"LIVE_MAP_RENDERED (bridge note: {e})"
+        return json.dumps({
+            "world": str(r),
+            "live_window_screenshot": screen_info,
+            "live_world_map_png": map_info,
+            "watermark": WATERMARK,
+        }, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({"hata": str(e)}, ensure_ascii=False)
 
