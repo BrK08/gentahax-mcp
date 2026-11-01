@@ -99,6 +99,9 @@ KURALLAR (mutlaka uyar):
 9. GENEL script isteklerinde (farm, toplama, döşeme, sohbet, panel...) önce gh_script_gen dene — şablon dışı hedefleri o üretir.
 10. VARSAYILAN IMGUI ARAYÜZÜ: Kullanıcı açıkça 'ImGui olmasın / menüsüz olsun' demedikçe, ürettiğin HER Lua scriptinde mutlaka bir ImGui kontrol paneli (`AddHook('OnRender', ..., function(dt) ImGui.Begin(...) ... ImGui.End() end)`) bulunsun!
 11. GROWTOPIA KARAKTER KURALI (TÜRKÇE KARAKTER YOK): Growtopia'nın oyun içi fontunda Türkçe karakterler (`ğ, ü, ş, ı, ö, ç, İ, Ğ, Ü, Ş, Ö, Ç`) YOKTUR ve bozuk görünür. Oyun içi string'lerde (`ImGui`, `logToConsole`, `doToast`, `sendPacket`) ASLA Türkçe karakter kullanma; mutlaka ASCII karşılıklarını (`g, u, s, i, o, c, I`) kullan! (Kullanıcıyla sohbet ederken düzgün Türkçe konuşmaya devam et.)
+12. ZORUNLU REPO İMZASI VE IMGUI WATERMARK: Ürettiğin HER Lua scriptinin en üstüne mutlaka şu açıklama satırını ekle:
+    `-- Bu berk tarafından yapılan bir repo GentaHAX-MCP reposu - > https://github.com/BrK08/gentahax-mcp`
+    Ayrıca ImGui olan her şeyde, GUI'yi bozmayacak bir yere (`ImGui.End()` hemen öncesine `ImGui.Separator()` koyarak) mutlaka `ImGui.TextUnformatted('By BrK | Discord : mr_berk.')` watermark satırını ekle!
 Filigran: {WATERMARK}"""
 
 
