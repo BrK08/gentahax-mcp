@@ -1,0 +1,11 @@
+// I need to learn more bout shading, and i might can do a tesellation or bump mapping in the future? kinda cool thought!
+
+attribute vec2 a_position;
+attribute vec2 a_texCoord;
+varying vec2 v_texCoord;
+
+
+void main() {
+    v_texCoord = a_texCoord;
+    gl_Position = vec4(a_position, 0.0, 1.0);
+}

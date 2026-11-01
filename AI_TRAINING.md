@@ -2,18 +2,18 @@
 
 > **Paste this pack into ANY chat AI (ChatGPT, Claude, Gemini, GLM, DeepSeek...) and it
 > will write VALID GENTAHAX scripts.** Everything below is generated from REAL data:
-> official GENTAHAX v5.61 docs + DLL binary verification + the 6832-item items.dat
+> official GENTAHAX v5.61 docs + Official Discord snippets + DLL binary verification + the 6832-item items.dat
 > database. There is NOT a single invented function or ID in this pack.
 
 ## 0) How to Use
-- **ChatGPT (no API):** open a new chat → paste this WHOLE file as the first message
-  (or put it into a Custom GPT's Instructions) → then ask: *"break all the peppers in the world"*
-- **Claude:** upload to Project Knowledge or paste at the start of a chat
+- **ChatGPT / Gemini / Claude (with MCP):** run `python start_mcp.py` → connect the printed `https://xxxx.trycloudflare.com/mcp` URL → the AI sees your live world, writes scripts, and tests them automatically.
+- **ChatGPT / Claude (no API / no MCP):** open a new chat → paste this WHOLE file as the first message
+  (or put it into a Custom GPT / Project Knowledge) → then ask: *"break all the peppers in the world"*
 - Save the produced script into the GENTAHAX **Script** folder → run it with the in-game **Lua Executor**
 - With the MCP connected, the AI generates via `gh_script_gen`, then `gh_auto_test`
   **runs it, reads the logs and tells you '✅ IT WORKS' or the exact error**
 
-## 1) 7 Golden Rules
+## 1) 7 Golden Rules (+ 2 Mandatory Rules)
 1. Use ONLY the functions listed below — **NEVER invent**. ('getPlayerList' WRONG → 'getPlayerlist' RIGHT.)
 2. NEVER guess item IDs — take them from the table or resolve live via `getItemByName('X').id`.
 3. Every loop MUST `sleep(math.random(200, 600))` — otherwise the client freezes + ban risk.
@@ -21,10 +21,12 @@
 5. Any packet-sending loop is ban-risky — tell the user **"⚠️ THIS HAS BAN RISK"** explicitly.
 6. Do background work in `runThread(fn, 'tag')` and make it stoppable with `killThread('tag')`.
 7. Auto-test markers: `doLog('AUTOTEST|START|...')` at start, `doLog('AUTOTEST|OK|...')` at end.
+8. **IMGUI UI BY DEFAULT:** Unless the user explicitly asks for *"no ImGui / headless"*, **EVERY script you generate MUST include an `OnRender` ImGui control window (`ImGui.Begin` / `ImGui.End`)** with status info and Start/Stop buttons.
+9. **GROWTOPIA ASCII-ONLY RULE (NO TURKISH CHARACTERS IN-GAME):** Growtopia's in-game font does NOT support Turkish characters (`ğ, ü, ş, ı, ö, ç, İ, Ğ, Ü, Ş, Ö, Ç`) and renders them as garbage. NEVER use Turkish characters inside in-game Lua strings (`ImGui`, `logToConsole`, `doToast`, `sendPacket`, `sendVariant`); always use ASCII equivalents (`g, u, s, i, o, c, I`).
 
 ## 2) Auto-Test Loop (the AI's standard workflow)
 ```
-1) write the script (following the rules)
+1) write the script (follow the 9 golden rules, include ImGui panel, use ASCII in-game strings)
 2) RUN it in the GENTAHAX executor (MCP: gh_auto_test)
 3) READ lua_logs.txt
 4a) AUTOTEST|OK / FARM_RESULT / error-free progress → tell the user "✅ IT WORKS"
@@ -49,8 +51,8 @@ on function existence is the executor itself.
 | NOT_IN_WORLD | Executor 'ERR|NO_WORLD' döndü — dünyada değilsin | Oyunu aç, bir dünyaya gir, sonra tekrar çalıştır |
 | NO_LOCAL | Executor 'ERR|NO_LOCAL' döndü — oyuncu henüz yüklenmedi | 2-3 saniye bekle ve tekrar çalıştır — oyun ekranı tam açılmamış olabilir |
 
-## 4) ANDROID Lua API — REAL (DLL v5.61 verified)
-### ANDROID — 57 fonksiyon (kaynak: OFFICIAL GENTA-HAX-DOCS (github.com/GENTA7740/GENTA-HAX-DOCS) + GENTAHAX v5.61 GTInternal....)
+## 4) ANDROID Lua API — REAL (DLL v5.61 + Official Discord verified)
+### ANDROID — 66 fonksiyon (kaynak: OFFICIAL GENTA-HAX-DOCS (github.com/GENTA7740/GENTA-HAX-DOCS) + GENTAHAX v5.61 GTInternal....)
 
 **ACTION**
 
@@ -58,6 +60,8 @@ on function existence is the executor itself.
   Verilen koordinattaki yerdeki esyayi toplama istegi gonderir. BAN RISKI: Hizli dongude kullanilirsa auto-collect bot algilanabilir.
 - `void requestTileChange(int x, int y, int item_id)` — risk: medium
   Verilen koordinata blok koyma/kesme istegi gonderir (PACKET_TILE_CHANGE_REQUEST). BAN RISKI: Spam yapilirsa block spam algilanir.
+- `void requestCollectByRange(int range)` — risk: medium
+  Oyuncunun etrafindaki verilen menzil (tile yaricapi, orn. 4) icindeki yerdeki esyalari toplar. Resmi PNB scriptlerinde kullanilir.
 
 **CAMERA**
 
@@ -85,6 +89,8 @@ on function existence is the executor itself.
   Discord webhook'una mesaj/embed gonderir. DiscordWebhook yapisi: username, avatar_url, content, useEmbeds, embeds.
 - `Response makeRequest(String url, String method, std::list<String> header, String body, int connection_time_out)` — risk: low
   HTTP istegi yapar. method: 'GET'/'POST'. Donus: Response.content. DLL icinde ornek kullanim: load(makeRequest(url,'GET').content)()
+- `void setENetInformation(String ip, int port)` — risk: high
+  OnENetInit hook'u icinde yeni ENet sunucu IP ve port bilgisini ayarlar (VPN'siz GTPS baglantisi icin). Uygulanmasi icin OnENetInit hook fonksiyonu 're
 
 **DEVICE**
 
@@ -109,6 +115,10 @@ on function existence is the executor itself.
   Tum hooklari kaldirir.
 - `void RemoveHook(String HookLabel)` — risk: low
   Belirtilen etiketli hook'u kaldirir.
+- `void ChangeHook(GentaHook, String HookLabel, function)` — risk: low
+  Var olan bir hook etiketinin fonksiyonunu gunceller.
+- `void CallHook(String HookLabel, ...)` — risk: low
+  Kayitli hook'u manuel tetikler.
 
 **INVENTORY**
 
@@ -132,6 +142,8 @@ on function existence is the executor itself.
   Logcat error seviyesinde loglar.
 - `void doLogInfo(String text) -- Logcat seviyesi` — risk: low
   Logcat info seviyesinde loglar.
+- `void warn(String text)` — risk: low
+  GENTAHAX konsoluna uyari mesaji yazar.
 
 **MOVEMENT**
 
@@ -166,6 +178,8 @@ on function existence is the executor itself.
   Calisan thread'lerin etiketlerini dondurur.
 - `void killThread(String thread_label)` — risk: low
   Belirtilen thread'i oldurur.
+- `table runParallel(table{function()})` — risk: low
+  Verilen fonksiyon tablosunu ayni oyun tick'i icinde paralel calistirir ve sonuclari tablo olarak dondurur. DIKKAT: Sonuc sirasi belirsiz olabilir. Son
 
 **TIMING**
 
@@ -189,6 +203,8 @@ on function existence is the executor itself.
   Android Java Toast gosterir.
 - `Vector2f getScreenSize()` — risk: low
   Ekran boyutunu dondurur.
+- `ImDrawList* NewDrawList()` — risk: low
+  Yeni ImGui cizim listesi olusturur (ImGui.FG:AddLine / ImGui.BG alternatifidir).
 
 **USEFUL**
 
@@ -202,6 +218,10 @@ on function existence is the executor itself.
   Verilen stringin 32-bit hash'ini dondurur.
 - `int hash64(String)` — risk: low
   Verilen stringin 64-bit hash'ini dondurur.
+- `String getCachePath()` — risk: low
+  Oyun onbellek dizin yolunu dondurur.
+- `int getSignal()` — risk: low
+  Baglanti sinyal durumunu dondurur.
 
 **WORLD**
 
@@ -213,8 +233,8 @@ on function existence is the executor itself.
   Dunyadaki tum tile'lari dondurur. Buyuk dunyalarde cok veri icerir.
 - `TileExtra* getExtraTile(int x, int y)` — risk: low
   Tile'in ekstra bilgilerini dondurur: kilit sahibi, agac buyumesi, ready (hasat) durumu, label, admin listesi.
-- `void setTile(Tile*)` — risk: low
-  Tile nesnesini degistirir. Dikkat: sadece istemci tarafinda gecerlidir, sunucu tarafini etkilemez.
+- `void setTile(int x, int y, Tile*)` — risk: low
+  Tile nesnesini ve flaglerini degistirir (setTile(x, y, {fg, bg, setFlags={...}})). Dikkat: sadece istemci tarafinda gecerlidir, sunucu tarafini etkile
 - `std::list<WorldObject*> getWorldObject()` — risk: low
   Dunyada yerde duran tum nesneleri (dusen esyalar) dondurur. Auto-collect scriptlerinin temeli.
 - `std::list<NPCList*> getNpc()` — risk: low
@@ -307,14 +327,22 @@ on function existence is the executor itself.
 | Wood Block | 100 |
 | Gems | 112 |
 | White Block | 168 |
+| Steel Block | 186 |
+| Bathtub | 230 |
 | World Lock | 242 |
+| High Tech Block | 324 |
+| Chandelier | 340 |
 | Checkpoint | 410 |
+| Sugar Cane | 954 |
 | Growtoken | 1486 |
 | Diamond Lock | 1796 |
+| Fish Tank | 3004 |
 | Cave Dirt | 3564 |
 | Pepper | 4570 |
 | Pepper Seed | 4571 |
 | Pepper Tree | 4584 |
+| Laser Grid | 5666 |
+| Magic Bell | 5990 |
 
 The full 6832-item database lives in the MCP (`gh_item_db_search`). If an item is
 not in this list, do NOT guess — ask the user or resolve live.
@@ -359,52 +387,133 @@ not in this list, do NOT guess — ask the user or resolve live.
 
 Bellek yaması isimleri (patchMemoryByName/restoreMemoryByName): Mod Fly, Ghost Mode, Night Vision, Can See Ghost, Anti portal, Anti Checkpoint, Anti Respawn, Anti Take Item, Dev Mode, Fast Fruits, Path Finder, Skip Update, Skip Update v2, No Block, No Clip, Ghost Ship, Anti Gravity, Auto Fishing, Auto Stop
 
-## 8) Verified Code Patterns
+## 8) Verified Code Patterns (Official Discord + GENTA-HAX-DOCS)
 
-**Thread + human-like delay:**
+**1. ImGui Control Panel + `runThread` Trigger (Default Pattern):**
 ```lua
-runThread(function()
-  while true do
-    sleep(math.random(400, 1200))
-    -- work
+local running = false
+AddHook('OnRender', 'mr_berk_ui', function(dt)
+  ImGui.Begin('mr_berk Control Panel')
+  ImGui.TextUnformatted('Status: ' .. (running and 'ACTIVE' or 'IDLE'))
+  if ImGui.Button('Start') and not running then
+    running = true
+    runThread(function()
+      while running do
+        sleep(math.random(400, 900))
+      end
+    end, 'main_job')
   end
-end, 'my_tag')   -- stop: killThread('my_tag')
-```
-
-**World scan + block punch:**
-```lua
-local w = getWorld()
-if not w then return 'ERR|NO_WORLD' end
-for _, t in pairs(getTile()) do
-  if t and t.fg == 4570 and t.pos then  -- 4570 = Pepper (real ID)
-    sendPacketRaw(false, { type = 3, state = 16, value = 18,
-                           x = t.pos.x, y = t.pos.y, punchx = t.pos.x, punchy = t.pos.y })
-    sleep(math.random(450, 1200))
+  ImGui.SameLine()
+  if ImGui.Button('Stop') then
+    running = false
+    killThread('main_job')
   end
-end
-```
-
-**Collecting dropped items (official helper — safer than punching):**
-```lua
-for _, obj in pairs(getWorldObject()) do
-  requestCollect(obj.pos.x, obj.pos.y, obj.id)
-  sleep(math.random(200, 500))
-end
-```
-
-**Chat listening (hook):**
-```lua
-AddHook('OnVarlist', 'chat', function(vars, netid)
-  if vars[0] == 'OnTalkBubble' then
-    logToConsole('[Chat] ' .. tostring(vars[2]))
-  end
+  ImGui.End()
 end)
 ```
 
-**Reading gems (NetAvatar field — real struct):**
+**2. Better PNB (`requestTileChange` + `requestCollectByRange`):**
+```lua
+local id = 340 -- Chandelier=340, Laser Grid=5666, Pepper Tree=4584, High Tech Block=324, Magic Bell=5990
+local XCoords = 2
+local YCoords = -1
+runThread(function()
+  while true do
+    sleep(180)
+    requestCollectByRange(4)
+    sleep(500)
+    local me = getLocal()
+    if me then
+      local px, py = me.pos.x // 32, me.pos.y // 32
+      for ox = -XCoords, XCoords do
+        local c = checkTile(px + ox, py + YCoords)
+        if c ~= nil and c.fg == 0 then
+          requestTileChange(c.pos.x, c.pos.y, id)
+          sleep(200)
+        end
+      end
+      sleep(200)
+      for ox = -XCoords, XCoords do
+        local tries = 0
+        local c = checkTile(px + ox, py + YCoords)
+        while c ~= nil and c.fg ~= 0 and tries < 10 do
+          requestTileChange(c.pos.x, c.pos.y, 18)
+          sleep(180)
+          c = checkTile(c.pos.x, c.pos.y)
+          tries = tries + 1
+        end
+      end
+    end
+  end
+end, 'better_pnb')
+```
+
+**3. Client-Side `setTile(x, y, Tile*)` with `setFlags`:**
 ```lua
 local me = getLocal()
-if me then logToConsole('Gems: ' .. tostring(me.gems)) end
+if me then
+  setTile(me.pos.x // 32, (me.pos.y // 32) + 1, {
+    fg = 8,
+    bg = 14,
+    setFlags = {
+      tileExtra = false,
+      locked = false,
+      wasSpliced = false,
+      willSpawnSeedToo = false,
+      flipped = false,
+      enabled = false,
+      public = false,
+      silenced = false,
+      water = true,
+      glue = false,
+      burn = false,
+      red = true,
+      green = false,
+      blue = false
+    }
+  })
+end
+```
+
+**4. `ImGui.FG:AddLine` Tree & NPC ESP (`worldToScreen`):**
+```lua
+AddHook('OnRender', 'esp_line', function(delta)
+  local p_local = getLocal()
+  if not p_local then return end
+  local _p = worldToScreen(p_local.pos.x, p_local.pos.y)
+  for _, v in pairs(getTile()) do
+    local _e = getExtraTile(v.pos.x, v.pos.y)
+    if _e.valid == true and _e.ready == true then
+      if _e.type == 4 or _e.type == 9 then
+        local _b = worldToScreen(v.pos.x * 32, v.pos.y * 32)
+        ImGui.FG:AddLine(_p, _b, 0xFFFFFFFF, 1.0)
+      end
+    end
+  end
+  for _, n in pairs(getNpc()) do
+    local _n = worldToScreen(n.current.x, n.current.y)
+    ImGui.FG:AddLine(_p, _n, 0xFF00FF00, 2.0)
+  end
+  collectgarbage('collect')
+end)
+```
+
+**5. `Json.encode` / `Json.decode`, `runParallel`, and GTPS Redirect (`OnENetInit`):**
+```lua
+local str = Json.encode({ name = 'Genta', cool = true, age = 21 })
+local data = Json.decode(str)
+logToConsole(tostring(data.name))
+
+local results = runParallel({
+  function() return 1 + 1 end,
+  function() return 'done' end
+})
+logToConsole(tostring(results[1]))
+
+AddHook('OnENetInit', 'gtps_redirect', function(ip, port)
+  setENetInformation('127.0.0.1', 17091)
+  return true
+end)
 ```
 
 ## 9) Ban Risk Rules (first 12)
@@ -427,6 +536,8 @@ if me then logToConsole('Gems: ' .. tostring(me.gems)) end
 3. What is mandatory in infinite loops? → **sleep (random 200-600ms)**
 4. How to enable a mod without writing a script? → **toggleCheat(26, true) / gh_cheat_set('Mod Fly', true)**
 5. Who decides whether a script works? → **ONLY the game executor + lua_logs.txt**
+6. Are Turkish characters (`ğ, ü, ş, ı, ö, ç, İ`) allowed in in-game strings? → **NO, ASCII only (`g, u, s, i, o, c, I`)**
+7. What UI must be included by default unless told otherwise? → **`OnRender` + `ImGui.Begin` control panel**
 
 ## 11) mr_berk
 GENTAHAX MCP v1.5.0 — Trained on real data · Ban-risk warning system · 45 tools

@@ -223,7 +223,7 @@ def examples_list():
 def example_get(fname):
     safe = Path(fname).name  # path traversal koruması
     p = EXAMPLES_DIR / safe
-    if p.exists() and p.suffix == ".lua":
+    if p.exists() and p.suffix in (".lua", ".vert", ".frag", ".txt"):
         return p.read_text(encoding="utf-8")
     return None
 
@@ -299,7 +299,7 @@ def analyze_code(code):
         known.update(api_names(plat))
     known.update(h["name"] for h in get_hooks("android") + get_hooks("windows"))
     known.update(IMGUI_FUNCTIONS)
-    known.update({"sleep", "pairs", "ipairs", "tostring", "tonumber", "math", "string", "table", "os", "io", "print", "pcall", "load", "setmetatable", "require"})
+    known.update({"sleep", "pairs", "ipairs", "tostring", "tonumber", "math", "string", "table", "os", "io", "print", "pcall", "load", "setmetatable", "require", "Json", "collectgarbage", "runParallel", "requestCollectByRange", "setENetInformation"})
 
     calls = set(re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", code))
     calls |= set(re.findall(r"\b(ImGui\.[A-Za-z0-9_]+)", code))
@@ -328,6 +328,11 @@ def analyze_code(code):
         "unknown_note": ("Bilinmeyen fonksiyon(lar) — gerçek GENTAHAX API'sinde yok, kod oyunda hata verir: "
                          + ", ".join(unknown)) if unknown else None,
         "syntax_issues": syntax_issues,
+        "turkish_char_warning": (
+            "⚠️ GROWTOPIA KARAKTER UYARISI: Oyun içi stringlerde Türkçe karakter bulundu! "
+            "Growtopia fontunda (ş, ğ, ü, ı, ö, ç, İ) karakterleri yoktur ve bozuk görünür. "
+            "Oyun içi yazılarda (ImGui, logToConsole, doToast, sendPacket) ASCII karşılıklarını (s, g, u, i, o, c, I) kullanın."
+        ) if re.search(r"[çğıöşüÇĞİÖŞÜ]", "\n".join(re.findall(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', code))) else None,
         "analyzed_by": f"{WATERMARK} GENTAHAX MCP risk engine v{VERSION}",
     }
 

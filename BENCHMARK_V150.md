@@ -1,7 +1,7 @@
 # GENTAHAX MCP v1.5.0 — GERÇEK BENCHMARK RAPORU (uydurma YOK)
 
-- **Tarih:** 2026-10-30 19:51:31 · **Süre:** 44.7 sn
-- **Ortam:** Python 3.12.15 · fastmcp 2.14.3 · lupa: kurulu (derleme kanıtları gerçek Lua motoruyla)
+- **Tarih:** 2026-11-01 15:08:33 · **Süre:** 63.7 sn
+- **Ortam:** Python 3.12.6 · fastmcp 4.1.4 · lupa: kurulu (derleme kanıtları gerçek Lua motoruyla)
 - **Köprü:** GENTAHAX_SCRIPT_DIR ayarlanMAMIŞ (bu makinede telefon/oyun yok) → canlı executor testi burada FİZİKSEL olarak imkânsız
 - **Sonuç:** **43/43 kanıt geçti**
 
@@ -46,14 +46,14 @@ regresyon testi).
 | A16 | gh_device_status() → köprü yapılandırılmamış gerçeğini açıkça söyler | ✅ GEÇTİ |
 | A17 | GERÇEK ÇÖKÜŞ DÜZELTMESİ (regresyon): lupa'ya dokunan araçlar artık araç çağrısı İÇİNDE motor KURMAZ (önce: Lua PANIC → süreç ölüyordu, stdio'da 'Connection closed'); aynı oturumda tekrar tekrar çağrılıyor | ✅ GEÇTİ |
 | B00 | Lua derleme motoru açılışta kurulmuş (çöküş düzeltmesi aktif) | ✅ GEÇTİ |
-| B01 | Tüm 9 şablon gerçek Lua motorunda derleniyor (çalıştırılmadan) | ✅ GEÇTİ |
+| B01 | Tüm 14 şablon gerçek Lua motorunda derleniyor (çalıştırılmadan) | ✅ GEÇTİ |
 | B02 | gh_farm_script_gen çıktısı (Pepper ID 4570 yerleştirilmiş) derleniyor | ✅ GEÇTİ |
 | B03 | gh_script_gen çıktısı derleniyor | ✅ GEÇTİ |
 | B04 | OYUN-İÇİ fonksiyonlar (getLocal/toggleCheat/sleep/sendPacketRaw) derlemeyi BOZMAZ — kullanıcının haklı tespiti, kod yoluyla kanıt | ✅ GEÇTİ |
 | B05 | GERÇEK gramer hatası (eksik 'end') yakalanır → executor'a gönderilmeden reddedilir | ✅ GEÇTİ |
 | C01 | AI_EGITIM.md + AI_TRAINING.md, veri dosyalarından üretimle BİREBİR aynı (elle yazılmış/uydurma içerik karışmış olamaz) | ✅ GEÇTİ |
-| C02 | Paketin KOD ALANINDAKİ (lua blokları + backtick imzaları) 75 farklı çağrılabilir ismin TAMAMI gerçek kaynaklı (71 gerçek API + 3 Lua stdlib/kelime + 1 gh_ aracı) — uydurma: SIFIR | ✅ GEÇTİ |
-| C03 | Paketteki 46 item-ID satırı + kod örneklerindeki sabitler (Pepper=4570, Dirt=2, Mod Fly=26) gerçek DB/enum ile DOĞRULANDI | ✅ GEÇTİ |
+| C02 | Paketin KOD ALANINDAKİ (lua blokları + backtick imzaları) 87 farklı çağrılabilir ismin TAMAMI gerçek kaynaklı (80 gerçek API + 5 Lua stdlib/kelime + 2 gh_ aracı) — uydurma: SIFIR | ✅ GEÇTİ |
+| C03 | Paketteki 62 item-ID satırı + kod örneklerindeki sabitler (Pepper=4570, Dirt=2, Mod Fly=26) gerçek DB/enum ile DOĞRULANDI | ✅ GEÇTİ |
 | C04 | Paketteki 32 hazır mod tablosu CheatCode enum'ının BİREBİR kopyası | ✅ GEÇTİ |
 | C05 | items.json gerçek boyut | ✅ GEÇTİ |
 | D01 | Gerçek executor hata dizesi → MISSING_FN + hedef fonksiyon doğru ayrıştırılır | ✅ GEÇTİ |
@@ -89,14 +89,14 @@ GERÇEK veritabanı sonucu (6832 esya — items.dat tabanlı):
 ### gh_cheat_set('mod fly', true) — köprüsüz
 ```
 ⚠️ Köprü kapalı.
-1) Windows: GENTAHAX kurulu dizindeki Script klasörünün tam yolunu GENTAHAX_SCRIPT_DIR ortam değişkenine yaz. 2) Android: GENTAHAX_TARGET=adb ve adb'de cihaz bağlı olsun. Sonra gh_bridge_deploy ile köprüyü kur.
+1) Windows: GENTAHAX kurulu dizindeki Script klasörünün tam yolunu GENTAHAX_SCRIPT_DIR ortam değişkenine yaz (veya start_mcp.py ile otomatik başlat). 2) Android: GENTAHAX_TARGET=adb ve adb'de cihaz bağlı olsun. Sonra gh_bridge_deploy ile köprüyü kur.
 
 Bilgi araçları (Bölüm 1-2) her zaman çalışır; canlı veri için köprü kurun: gh_bridge_deploy
 ```
 
 ### gh_auto_test(güvenli script) — köprüsüz
 ```
-{"sonuc": "CIHAZ_YOK", "calistirildi": false, "sozdizimi_on_kontrol": {"sonuc": "geçti", "detay": "derleme OK — kod ÇALIŞTIRILMADI, oyun fonksiyonları false hata vermez"}, "ipucu": "Canlı test için köprü gerekli — ⚠️ Köprü kapalı.\n1) Windows: GENTAHAX kurulu dizindeki Script klasörünün tam yolunu GENTAHAX_SCRIPT_DIR ortam değişkenine yaz. 2) Android: GENTAHAX_TARGET=adb ve adb'de cihaz bağlı olsun. Sonra gh_bri", "watermark": "mr_berk"}
+{"sonuc": "CIHAZ_YOK", "calistirildi": false, "sozdizimi_on_kontrol": {"sonuc": "geçti", "detay": "derleme OK — kod ÇALIŞTIRILMADI, oyun fonksiyonları false hata vermez"}, "ipucu": "Canlı test için köprü gerekli — ⚠️ Köprü kapalı.\n1) Windows: GENTAHAX kurulu dizindeki Script klasörünün tam yolunu GENTAHAX_SCRIPT_DIR ortam değişkenine yaz (veya start_mcp.py ile otomatik başlat). 2) Android: GENTAHAX_TARGET=adb v", "watermark": "mr_berk"}
 ```
 
 ### gh_script_gen('Pepper'ları kır') — script
@@ -122,7 +122,7 @@ if not me then return 'ERR|NO_LOCAL' end
 
 ### B01/B04/B05 — gerçek derleme çıktıları
 ```
-şablonlar: auto_collect: geçti, varlist_logger: geçti, chat_command: geçti, esp_overlay: geçti, tree_harvest: geçti, imgui_panel: geçti, webhook_notify: geçti, dirt_farm: geçti, human_responder: geçti
+şablonlar: auto_collect: geçti, varlist_logger: geçti, chat_command: geçti, esp_overlay: geçti, tree_harvest: geçti, imgui_panel: geçti, webhook_notify: geçti, dirt_farm: geçti, human_responder: geçti, better_pnb: geçti, imgui_addline_esp: geçti, settile_visualizer: geçti, gtps_enet_redirect: geçti, json_and_parallel: geçti
 
 oyun fonksiyonlu kod → {"sonuc": "geçti", "detay": "derleme OK — kod ÇALIŞTIRILMADI, oyun fonksiyonları false hata vermez"}
 
@@ -134,10 +134,10 @@ eksik 'end' kodu   → {"sonuc": "hata", "detay": "[string \"local x = getLocal(
 ### C02 — kod alanındaki çağrılabilir isimler (denetim özeti, gerçek çıktı)
 ```
 denetim kapsamı: lua kod blokları + backtick imza alanları (yorumlar ayıklanmış)
-toplam farklı isim: 75
-gerçek API veri dosyalarında: 71
-Lua stdlib/anahtar kelime: 3
-gh_ MCP araçları: 1
+toplam farklı isim: 87
+gerçek API veri dosyalarında: 80
+Lua stdlib/anahtar kelime: 5
+gh_ MCP araçları: 2
 UYDURMA: 0
 ```
 

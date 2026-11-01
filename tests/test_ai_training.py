@@ -82,7 +82,7 @@ known.update({  # Lua 5.4 standart kütüphane
     "next", "unpack", "rawget", "rawset", "format", "concat", "insert", "sort",
     "remove", "random", "randomseed", "floor", "ceil", "abs", "min", "max",
     "time", "find", "gsub", "gmatch", "match", "lower", "upper", "sub", "rep",
-    "byte", "char", "len",
+    "byte", "char", "len", "collectgarbage",
 })
 KEYWORDS = {"if", "for", "while", "function", "end", "return", "and", "or", "not",
             "local", "then", "do", "else", "elseif", "repeat", "until", "true",
@@ -94,7 +94,7 @@ for block in lua_blocks:
     code = re.sub(r"--[^\n]*", "", code)
     code = re.sub(r"\b\d+\.\d+\b", "0", code)
     # stdlib metod çağrıları (string.format, math.random...) ayrıştır:
-    code = re.sub(r"[A-Za-z_][\w.]*\s*\.\s*[A-Za-z_]\w*\s*\(", "STDMETHOD(", code)
+    code = re.sub(r"[A-Za-z_][\w.]*\s*[.:]\s*[A-Za-z_]\w*\s*\(", "STDMETHOD(", code)
     for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", code):
         fn = m.group(1)
         if fn not in known and fn not in KEYWORDS:

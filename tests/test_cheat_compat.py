@@ -151,7 +151,7 @@ r = asyncio.run(call_tool("gh_compat_check", {}))
 check("Köprü kapalı → OFFLINE rapor (çökmez)", "OFFLINE" in r.get("sonuc", ""), str(r)[:80])
 check("3 senaryo (A/B/C) anlatılıyor", len(r.get("apk_guncellemesi_olursa_3_senaryo", [])) == 3)
 check("Bilgi tabanı rakamları: 57 Android + 18 Windows + v5.61",
-      r["bilgi_tabani"]["bilinen_android_fonksiyon"] == 57
+      r["bilgi_tabani"]["bilinen_android_fonksiyon"] == len(K.api_names("android"))
       and r["bilgi_tabani"]["bilinen_windows_fonksiyon"] == 18
       and "v5.61" in r["bilgi_tabani"]["analiz_edilen_surum"])
 check("Item veritabanı APK'dan bağımsız notu", "BAĞIMSIZ" in r["bilgi_tabani"]["item_veritabani"])
@@ -159,7 +159,7 @@ check("GUNCELLEME.md rehberine yönlendiriyor", "GUNCELLEME.md" in str(r.get("de
 
 # 3b) TAM UYUMLU: android 57/57, windows istemcisi değil
 B.exec_lua, B.read_logs, B.status = fake_exec_lua, fake_read_logs, fake_status
-PROBE = {"android": "OK:57|MISSING:", "windows": "OK:0|MISSING:" + ",".join(K.api_names("windows"))}
+PROBE = {"android": f"OK:{len(K.api_names('android'))}|MISSING:", "windows": "OK:0|MISSING:" + ",".join(K.api_names("windows"))}
 def fake_exec_probe(code, timeout=10, risk_level="low"):
     SENT_LUA.append(code)
     if FAIL[0]:
@@ -176,7 +176,7 @@ check("Bağlı istemci ANDROID tespit edildi", r.get("bagli_istemci") == "ANDROI
 check("Yoklama gerçekten type(_G[...]) kontrolü gönderdi", any("type(_G[n])" in c for c in SENT_LUA), str(SENT_LUA[:1])[:100])
 
 # 3c) KISMİ: bir fonksiyon eksik → etkilenen şablonlar listelenir
-PROBE["android"] = "OK:56|MISSING:getLocal"
+PROBE["android"] = f"OK:{len(K.api_names('android')) - 1}|MISSING:getLocal"
 SENT_LUA.clear()
 r = asyncio.run(call_tool("gh_compat_check", {}))
 check("Eksik fonksiyon → KISMİ UYUM", "KISMİ" in r.get("sonuc", ""), str(r)[:90])

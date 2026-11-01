@@ -32,6 +32,8 @@ COMMON_ITEM_NAMES = [
     "Wood Block", "Wooden Background", "Checkpoint", "Bouncy Block", "White Block",
     "Dirt Seed", "Rock Seed", "Pepper Seed", "Gems", "World Lock",
     "Diamond Lock", "Blue Gem Lock", "Growtoken",
+    "Chandelier", "Laser Grid", "High Tech Block", "Magic Bell",
+    "Sugar Cane", "Steel Block", "Bathtub", "Fish Tank",
 ]
 
 
@@ -122,18 +124,17 @@ def build_pack(lang="tr"):
 
 > **Bu paketi herhangi bir sohbet AI'na (ChatGPT, Claude, Gemini, GLM, DeepSeek...) yapıştır —
 > o AI bu kurallarla GEÇERLİ GENTAHAX scripti yazar.** Paketin tamamı GERÇEK verilerden
-> üretilmiştir: GENTAHAX v5.61 resmi dokümantasyon + DLL binary doğrulaması +
+> üretilmiştir: GENTAHAX v5.61 resmi dokümantasyon + Resmi Discord paylaşımları + DLL binary doğrulaması +
 > items.dat tabanlı {n_items} eşyalık veritabanı. İçinde TEK BİR uydurma fonksiyon/ID yoktur.
 
 ## 0) Nasıl Kullanılır
-- **ChatGPT (API'siz):** yeni sohbet aç → bu dosyanın TAMAMINI ilk mesaj olarak yapıştır
-  (veya Custom GPT → Instructions'a koy) → sonra iste: *"dünyadaki pepperları kır"*
-- **Claude:** Project → Knowledge'a yükle ya da sohbet başına yapıştır
+- **ChatGPT / Gemini / Claude (MCP ile):** `python start_mcp.py` çalıştır → çıkan `https://xxxx.trycloudflare.com/mcp` adresini bağla → AI canlı dünyanı görür, script yazar ve test eder.
+- **ChatGPT / Claude (API'siz / MCP'siz):** yeni sohbet aç → bu dosyanın TAMAMINI ilk mesaj olarak yapıştır
+  (veya Custom GPT / Project Knowledge'a koy) → sonra iste: *"dünyadaki pepperları kır"*
 - Çıkan scripti GENTAHAX **Script** klasörüne kaydet → oyun içinde **Lua Executor** ile çalıştır
-- MCP bağlıysa (chat.py / Claude Desktop / uygulama): AI `gh_script_gen` ile üretir,
-  `gh_auto_test` ile **çalıştırır, logları okur ve sana '✅ ÇALIŞIYOR' ya da hatayı söyler**
+- MCP bağlıysa: AI `gh_script_gen` ile üretir, `gh_auto_test` ile **çalıştırır, logları okur ve sana '✅ ÇALIŞIYOR' ya da hatayı söyler**
 
-## 1) 7 Altın Kural
+## 1) 7 Altın Kural (+ 2 Ek ZORUNLU Kural)
 1. **SADECE** aşağıdaki API listesindeki fonksiyonları kullan — **UYDURMA**. Emin değilsen
    üretme, kullanıcıya sor. ('getPlayerList' YANLIŞ → 'getPlayerlist' DOĞRU gibi.)
 2. Item ID'lerini **ASLA tahmin etme** — tablodan al ya da script içinde
@@ -144,10 +145,12 @@ def build_pack(lang="tr"):
 5. Paket gönderen her döngü ban risklidir — kullanıcıya açıkça **"⚠️ BUNDA BAN RİSKİ VAR"** de.
 6. Arka plan işini `runThread(fn, 'etiket')` ile yap, `killThread('etiket')` ile durdurulabilir olsun.
 7. Otomatik test işaretleri: başta `doLog('AUTOTEST|START|...')`, bitişte `doLog('AUTOTEST|OK|...')`
+8. **VARSAYILAN IMGUI ARAYÜZÜ:** Kullanıcı açıkça *"ImGui olmasın / menüsüz olsun"* demedikçe, ürettiğin **HER scriptte varsayılan olarak `AddHook('OnRender', ...)` ile bir ImGui kontrol penceresi (`ImGui.Begin` / `ImGui.End`)** bulunsun (Durdur/Başlat butonu, durum bilgisi vb.).
+9. **GROWTOPIA KARAKTER KURALI (TÜRKÇE KARAKTER YOK):** Growtopia'nın oyun içi fontunda Türkçe karakterler (`ğ, ü, ş, ı, ö, ç, İ, Ğ, Ü, Ş, Ö, Ç`) **YOKTUR** ve bozuk görünür! Oyun içinde görünen metinlerde (`ImGui`, `logToConsole`, `doToast`, `sendPacket`, `sendVariant`) **ASLA Türkçe karakter kullanma**; her zaman ASCII karşılıklarını (`g, u, s, i, o, c, I`) yaz (ör. `'Baslat'`, `'Koyulan'`, `'Calisiyor'`). Kullanıcıyla sohbet ederken düzgün Türkçe konuşmaya devam et.
 
 ## 2) Otomatik Test Döngüsü (AI'nın standart iş akışı)
 ```
-1) scripti yaz (kurallara uy)
+1) scripti yaz (9 altın kurala uy, ImGui panel ekle, oyun içi stringlerde ASCII kullan)
 2) GENTAHAX executor'ında ÇALIŞTIR (MCP: gh_auto_test)
 3) lua_logs.txt'yi OKU
 4a) AUTOTEST|OK / FARM_RESULT / hatasız ilerleme → kullanıcıya "✅ ÇALIŞIYOR" de
@@ -162,7 +165,7 @@ fonksiyonlarından false hata VERMEZ; varlık kontrolü tek yetkili kaynak execu
 ## 3) Hata Tablosu (GENTAHAX executor'ının lua_logs.txt formatı)
 {errors}
 
-## 4) ANDROID Lua API — GERÇEK (DLL v5.61 doğrulamalı)
+## 4) ANDROID Lua API — GERÇEK (DLL v5.61 + Resmi Discord doğrulamalı)
 {android_api}
 
 ## 5) WINDOWS Lua API — GERÇEK
@@ -179,53 +182,197 @@ kullanılanlardır; olmayanı **tahmin etme** — kullanıcıya sor veya canlı 
 
 {cheats}
 
-## 8) Doğrulanmış Kod Kalıpları
+## 8) Doğrulanmış Kod Kalıpları (Resmi Discord + GENTA-HAX-DOCS)
 
-**Thread + insan benzeri delay:**
+**1. ImGui Kontrol Paneli + `runThread` Tetikleme (Varsayılan Şablon):**
 ```lua
-runThread(function()
-  while true do
-    sleep(math.random(400, 1200))
-    -- iş
+local calisiyor = false
+AddHook('OnRender', 'mr_berk_ui', function(dt)
+  ImGui.Begin('mr_berk Kontrol Paneli')
+  ImGui.TextUnformatted('Durum: ' .. (calisiyor and 'AKTIF' or 'BEKLEMEDE'))
+  if ImGui.Button('Baslat') and not calisiyor then
+    calisiyor = true
+    runThread(function()
+      while calisiyor do
+        sleep(math.random(400, 900))
+      end
+    end, 'ana_is')
   end
-end, 'benim_etiket')   -- durdur: killThread('benim_etiket')
-```
-
-**Dünya tarama + blok kırma (punch):**
-```lua
-local w = getWorld()
-if not w then return 'ERR|NO_WORLD' end
-for _, t in pairs(getTile()) do
-  if t and t.fg == 4570 and t.pos then  -- 4570 = Pepper (gerçek ID)
-    sendPacketRaw(false, {{ type = 3, state = 16, value = 18,
-                           x = t.pos.x, y = t.pos.y, punchx = t.pos.x, punchy = t.pos.y }})
-    sleep(math.random(450, 1200))
+  ImGui.SameLine()
+  if ImGui.Button('Durdur') then
+    calisiyor = false
+    killThread('ana_is')
   end
-end
-```
-
-**Yerdeki eşya toplama (resmi yardımcı — punch'tan güvenli):**
-```lua
-for _, obj in pairs(getWorldObject()) do
-  requestCollect(obj.pos.x, obj.pos.y, obj.id)
-  sleep(math.random(200, 500))
-end
-```
-
-**Sohbet dinleme (hook):**
-```lua
-AddHook('OnVarlist', 'chat', function(vars, netid)
-  if vars[0] == 'OnTalkBubble' then
-    logToConsole('[Sohbet] ' .. tostring(vars[2]))
-  end
+  ImGui.End()
 end)
 ```
 
-**Gems okuma (NetAvatar alanı — gerçek struct):**
+**2. Better PNB (`requestTileChange` + `requestCollectByRange`):**
+```lua
+local id = 340 -- Chandelier=340, Laser Grid=5666, Pepper Tree=4584, High Tech Block=324, Magic Bell=5990
+local XCoords = 2
+local YCoords = -1
+runThread(function()
+  while true do
+    sleep(180)
+    requestCollectByRange(4)
+    sleep(500)
+    local me = getLocal()
+    if me then
+      local px, py = me.pos.x // 32, me.pos.y // 32
+      for ox = -XCoords, XCoords do
+        local c = checkTile(px + ox, py + YCoords)
+        if c ~= nil and c.fg == 0 then
+          requestTileChange(c.pos.x, c.pos.y, id)
+          sleep(200)
+        end
+      end
+      sleep(200)
+      for ox = -XCoords, XCoords do
+        local tries = 0
+        local c = checkTile(px + ox, py + YCoords)
+        while c ~= nil and c.fg ~= 0 and tries < 10 do
+          requestTileChange(c.pos.x, c.pos.y, 18)
+          sleep(180)
+          c = checkTile(c.pos.x, c.pos.y)
+          tries = tries + 1
+        end
+      end
+    end
+  end
+end, 'better_pnb')
+```
+
+**3. `setTile(x, y, Tile*)` ile İstemci Tarafı (Görsel) Tile & Flag Değiştirme:**
 ```lua
 local me = getLocal()
-if me then logToConsole('Gems: ' .. tostring(me.gems)) end
+if me then
+  setTile(me.pos.x // 32, (me.pos.y // 32) + 1, {{
+    fg = 8,
+    bg = 14,
+    setFlags = {{
+      tileExtra = false,
+      locked = false,
+      wasSpliced = false,
+      willSpawnSeedToo = false,
+      flipped = false,
+      enabled = false,
+      public = false,
+      silenced = false,
+      water = true,
+      glue = false,
+      burn = false,
+      red = true,
+      green = false,
+      blue = false
+    }}
+  }})
+end
 ```
+
+**4. `ImGui.FG:AddLine` ile Hazır Ağaç & NPC ESP Çizimi (`worldToScreen`):**
+```lua
+AddHook('OnRender', 'esp_line', function(delta)
+  local p_local = getLocal()
+  if not p_local then return end
+  local _p = worldToScreen(p_local.pos.x, p_local.pos.y)
+  for _, v in pairs(getTile()) do
+    local _e = getExtraTile(v.pos.x, v.pos.y)
+    if _e.valid == true and _e.ready == true then
+      if _e.type == 4 or _e.type == 9 then
+        local _b = worldToScreen(v.pos.x * 32, v.pos.y * 32)
+        ImGui.FG:AddLine(_p, _b, 0xFFFFFFFF, 1.0)
+      end
+    end
+  end
+  for _, n in pairs(getNpc()) do
+    local _n = worldToScreen(n.current.x, n.current.y)
+    ImGui.FG:AddLine(_p, _n, 0xFF00FF00, 2.0)
+  end
+  collectgarbage('collect')
+end)
+```
+
+**5. `getTile()` & `getExtraTile(x, y).label` Okuma:**
+```lua
+for _, i in pairs(getTile()) do
+  if getExtraTile(i.pos.x, i.pos.y).valid == true then
+    doLog('Label: ' .. tostring(getExtraTile(i.pos.x, i.pos.y).label))
+  end
+end
+```
+
+**6. `Json.encode` / `Json.decode` ve `runParallel`:**
+```lua
+local str = Json.encode({{ name = 'Genta', cool = true, age = 21, hobbies = {{ 'coding', 'modding' }} }})
+logToConsole(str)
+local data = Json.decode(str)
+logToConsole(tostring(data.name))
+
+-- runParallel: ayni oyun tick'inde paralel calistirir (ASLA sonsuz dongu koyma!)
+local results = runParallel({{
+  function() return 1 + 1 end,
+  function() return 'done' end
+}})
+logToConsole(tostring(results[1]) .. ' / ' .. tostring(results[2]))
+```
+
+**7. VPN'siz GTPS Bağlantısı (`OnENetInit` + `setENetInformation`):**
+```lua
+AddHook('OnENetInit', 'gtps_redirect', function(ip, port)
+  logToConsole('IP: ' .. tostring(ip) .. ' Port: ' .. tostring(port))
+  setENetInformation('127.0.0.1', 17091)
+  return true -- Yeni ENet bilgisini kullanmak icin true dondur!
+end)
+```
+
+**8. Tüm `AddHook` Türleri ve Paket Engelleme (`return true`):**
+```lua
+-- OnVarlist: true dondurursen varlist istemci tarafindan islenmez (bloklanir)
+AddHook('onvarlist', 'vl_hook', function(vlist, netid)
+  logToConsole('VAR [1]: ' .. tostring(vlist[1]))
+  return false
+end)
+
+-- OnGameUpdatePacket: true dondurursen gelen update paketi bloklanir
+AddHook('ongameupdatepacket', 'gup_hook', function(raw)
+  logToConsole('Packet Type: ' .. tostring(raw.type))
+  return false
+end)
+
+-- OnRawPacket: true dondurursen giden raw paket bloklanir
+AddHook('onrawpacket', 'raw_hook', function(raw)
+  logToConsole('Raw Type: ' .. tostring(raw.type))
+  return false
+end)
+
+-- OnTouch ve OnTextPacket
+AddHook('ontouch', 'touch_hook', function(x, y)
+  logToConsole('Touch X: ' .. tostring(x) .. ' Y: ' .. tostring(y))
+end)
+AddHook('ontextpacket', 'txt_hook', function(pkt)
+  logToConsole('Packet: ' .. tostring(pkt))
+end)
+-- UYARI: OnRender icinde ASLA logToConsole kullanma (FPS cokertir); gerekirse doLog kullan!
+```
+
+**9. Discord Webhook Gönderimi (`sendWebhook`) ve Uzaktan Extender Yükleme (`makeRequest`):**
+```lua
+local Webhook = {{
+  username = 'mr_berk Webhook',
+  content = 'Bildirim mesaji - ASCII',
+  useEmbeds = true,
+  embeds = {{ {{ title = 'Rapor', description = 'Islem tamamlandi', color = 15258703 }} }}
+}}
+sendWebhook('https://discord.com/api/webhooks/ID/TOKEN', Webhook)
+
+-- Uzaktan script calistirma (Windows + Android uyumlu):
+load(makeRequest('https://raw.githubusercontent.com/GENTA7740/GENTA-HAX-DOCS/refs/heads/main/example/ImGui/extender.lua', 'GET').content)()
+```
+
+**10. GFuscator `#region _EXPOSED_` Direktifi & Custom Shaders:**
+- **GFuscator:** Script şifrelenirken açık metin (düzenlenebilir) kalmasını istediğin ayar bloğunu `#region _EXPOSED_` ve `#endregion` arasına al (Not: Raw Lua modunda çalışmaz, sadece GFuscator içindir).
+- **Custom Shaders:** Özel GLSL shader dosyalarını (`main.vert` ve `main.frag`) Android'de `/android/media/GENTAHAX/Shaders/` klasörüne koy (`gh_example_get('main.vert')` ve `gh_example_get('main.frag')` ile Fake Chams örneğini alabilirsin).
 
 ## 9) Ban Riski Kuralları (ilk 12)
 {bans}
@@ -236,6 +383,8 @@ if me then logToConsole('Gems: ' .. tostring(me.gems)) end
 3. Sonsuz döngüde ne şart? → **sleep (rastgele 200-600ms)**
 4. Bir modu açmanın script yazmadan yolu? → **toggleCheat(26, true) / gh_cheat_set('Mod Fly', true)**
 5. Çalışıp çalışmadığına kim karar verir? → **SADECE oyunun executor'ı + lua_logs.txt**
+6. Oyun içi metinlerde (`ImGui`, `logToConsole`, `doToast`) Türkçe karakter (`ğ, ü, ş, ı, ö, ç, İ`) kullanılır mı? → **HAYIR, sadece ASCII (`g, u, s, i, o, c, I`)**
+7. Kullanıcı aksini belirtmedikçe her scriptte hangi arayüz olmalı? → **`OnRender` + `ImGui.Begin` kontrol paneli**
 
 ## 11) {WATERMARK}
 GENTAHAX MCP v{VERSION} — Gerçek verilerle eğitildi · Ban riski uyarı sistemli · 45 araç
@@ -244,18 +393,18 @@ GENTAHAX MCP v{VERSION} — Gerçek verilerle eğitildi · Ban riski uyarı sist
 
 > **Paste this pack into ANY chat AI (ChatGPT, Claude, Gemini, GLM, DeepSeek...) and it
 > will write VALID GENTAHAX scripts.** Everything below is generated from REAL data:
-> official GENTAHAX v5.61 docs + DLL binary verification + the {n_items}-item items.dat
+> official GENTAHAX v5.61 docs + Official Discord snippets + DLL binary verification + the {n_items}-item items.dat
 > database. There is NOT a single invented function or ID in this pack.
 
 ## 0) How to Use
-- **ChatGPT (no API):** open a new chat → paste this WHOLE file as the first message
-  (or put it into a Custom GPT's Instructions) → then ask: *"break all the peppers in the world"*
-- **Claude:** upload to Project Knowledge or paste at the start of a chat
+- **ChatGPT / Gemini / Claude (with MCP):** run `python start_mcp.py` → connect the printed `https://xxxx.trycloudflare.com/mcp` URL → the AI sees your live world, writes scripts, and tests them automatically.
+- **ChatGPT / Claude (no API / no MCP):** open a new chat → paste this WHOLE file as the first message
+  (or put it into a Custom GPT / Project Knowledge) → then ask: *"break all the peppers in the world"*
 - Save the produced script into the GENTAHAX **Script** folder → run it with the in-game **Lua Executor**
 - With the MCP connected, the AI generates via `gh_script_gen`, then `gh_auto_test`
   **runs it, reads the logs and tells you '✅ IT WORKS' or the exact error**
 
-## 1) 7 Golden Rules
+## 1) 7 Golden Rules (+ 2 Mandatory Rules)
 1. Use ONLY the functions listed below — **NEVER invent**. ('getPlayerList' WRONG → 'getPlayerlist' RIGHT.)
 2. NEVER guess item IDs — take them from the table or resolve live via `getItemByName('X').id`.
 3. Every loop MUST `sleep(math.random(200, 600))` — otherwise the client freezes + ban risk.
@@ -263,10 +412,12 @@ GENTAHAX MCP v{VERSION} — Gerçek verilerle eğitildi · Ban riski uyarı sist
 5. Any packet-sending loop is ban-risky — tell the user **"⚠️ THIS HAS BAN RISK"** explicitly.
 6. Do background work in `runThread(fn, 'tag')` and make it stoppable with `killThread('tag')`.
 7. Auto-test markers: `doLog('AUTOTEST|START|...')` at start, `doLog('AUTOTEST|OK|...')` at end.
+8. **IMGUI UI BY DEFAULT:** Unless the user explicitly asks for *"no ImGui / headless"*, **EVERY script you generate MUST include an `OnRender` ImGui control window (`ImGui.Begin` / `ImGui.End`)** with status info and Start/Stop buttons.
+9. **GROWTOPIA ASCII-ONLY RULE (NO TURKISH CHARACTERS IN-GAME):** Growtopia's in-game font does NOT support Turkish characters (`ğ, ü, ş, ı, ö, ç, İ, Ğ, Ü, Ş, Ö, Ç`) and renders them as garbage. NEVER use Turkish characters inside in-game Lua strings (`ImGui`, `logToConsole`, `doToast`, `sendPacket`, `sendVariant`); always use ASCII equivalents (`g, u, s, i, o, c, I`).
 
 ## 2) Auto-Test Loop (the AI's standard workflow)
 ```
-1) write the script (following the rules)
+1) write the script (follow the 9 golden rules, include ImGui panel, use ASCII in-game strings)
 2) RUN it in the GENTAHAX executor (MCP: gh_auto_test)
 3) READ lua_logs.txt
 4a) AUTOTEST|OK / FARM_RESULT / error-free progress → tell the user "✅ IT WORKS"
@@ -282,7 +433,7 @@ on function existence is the executor itself.
 ## 3) Error Table (GENTAHAX executor lua_logs.txt format)
 {errors}
 
-## 4) ANDROID Lua API — REAL (DLL v5.61 verified)
+## 4) ANDROID Lua API — REAL (DLL v5.61 + Official Discord verified)
 {android_api}
 
 ## 5) WINDOWS Lua API — REAL
@@ -299,52 +450,133 @@ not in this list, do NOT guess — ask the user or resolve live.
 
 {cheats}
 
-## 8) Verified Code Patterns
+## 8) Verified Code Patterns (Official Discord + GENTA-HAX-DOCS)
 
-**Thread + human-like delay:**
+**1. ImGui Control Panel + `runThread` Trigger (Default Pattern):**
 ```lua
-runThread(function()
-  while true do
-    sleep(math.random(400, 1200))
-    -- work
+local running = false
+AddHook('OnRender', 'mr_berk_ui', function(dt)
+  ImGui.Begin('mr_berk Control Panel')
+  ImGui.TextUnformatted('Status: ' .. (running and 'ACTIVE' or 'IDLE'))
+  if ImGui.Button('Start') and not running then
+    running = true
+    runThread(function()
+      while running do
+        sleep(math.random(400, 900))
+      end
+    end, 'main_job')
   end
-end, 'my_tag')   -- stop: killThread('my_tag')
-```
-
-**World scan + block punch:**
-```lua
-local w = getWorld()
-if not w then return 'ERR|NO_WORLD' end
-for _, t in pairs(getTile()) do
-  if t and t.fg == 4570 and t.pos then  -- 4570 = Pepper (real ID)
-    sendPacketRaw(false, {{ type = 3, state = 16, value = 18,
-                           x = t.pos.x, y = t.pos.y, punchx = t.pos.x, punchy = t.pos.y }})
-    sleep(math.random(450, 1200))
+  ImGui.SameLine()
+  if ImGui.Button('Stop') then
+    running = false
+    killThread('main_job')
   end
-end
-```
-
-**Collecting dropped items (official helper — safer than punching):**
-```lua
-for _, obj in pairs(getWorldObject()) do
-  requestCollect(obj.pos.x, obj.pos.y, obj.id)
-  sleep(math.random(200, 500))
-end
-```
-
-**Chat listening (hook):**
-```lua
-AddHook('OnVarlist', 'chat', function(vars, netid)
-  if vars[0] == 'OnTalkBubble' then
-    logToConsole('[Chat] ' .. tostring(vars[2]))
-  end
+  ImGui.End()
 end)
 ```
 
-**Reading gems (NetAvatar field — real struct):**
+**2. Better PNB (`requestTileChange` + `requestCollectByRange`):**
+```lua
+local id = 340 -- Chandelier=340, Laser Grid=5666, Pepper Tree=4584, High Tech Block=324, Magic Bell=5990
+local XCoords = 2
+local YCoords = -1
+runThread(function()
+  while true do
+    sleep(180)
+    requestCollectByRange(4)
+    sleep(500)
+    local me = getLocal()
+    if me then
+      local px, py = me.pos.x // 32, me.pos.y // 32
+      for ox = -XCoords, XCoords do
+        local c = checkTile(px + ox, py + YCoords)
+        if c ~= nil and c.fg == 0 then
+          requestTileChange(c.pos.x, c.pos.y, id)
+          sleep(200)
+        end
+      end
+      sleep(200)
+      for ox = -XCoords, XCoords do
+        local tries = 0
+        local c = checkTile(px + ox, py + YCoords)
+        while c ~= nil and c.fg ~= 0 and tries < 10 do
+          requestTileChange(c.pos.x, c.pos.y, 18)
+          sleep(180)
+          c = checkTile(c.pos.x, c.pos.y)
+          tries = tries + 1
+        end
+      end
+    end
+  end
+end, 'better_pnb')
+```
+
+**3. Client-Side `setTile(x, y, Tile*)` with `setFlags`:**
 ```lua
 local me = getLocal()
-if me then logToConsole('Gems: ' .. tostring(me.gems)) end
+if me then
+  setTile(me.pos.x // 32, (me.pos.y // 32) + 1, {{
+    fg = 8,
+    bg = 14,
+    setFlags = {{
+      tileExtra = false,
+      locked = false,
+      wasSpliced = false,
+      willSpawnSeedToo = false,
+      flipped = false,
+      enabled = false,
+      public = false,
+      silenced = false,
+      water = true,
+      glue = false,
+      burn = false,
+      red = true,
+      green = false,
+      blue = false
+    }}
+  }})
+end
+```
+
+**4. `ImGui.FG:AddLine` Tree & NPC ESP (`worldToScreen`):**
+```lua
+AddHook('OnRender', 'esp_line', function(delta)
+  local p_local = getLocal()
+  if not p_local then return end
+  local _p = worldToScreen(p_local.pos.x, p_local.pos.y)
+  for _, v in pairs(getTile()) do
+    local _e = getExtraTile(v.pos.x, v.pos.y)
+    if _e.valid == true and _e.ready == true then
+      if _e.type == 4 or _e.type == 9 then
+        local _b = worldToScreen(v.pos.x * 32, v.pos.y * 32)
+        ImGui.FG:AddLine(_p, _b, 0xFFFFFFFF, 1.0)
+      end
+    end
+  end
+  for _, n in pairs(getNpc()) do
+    local _n = worldToScreen(n.current.x, n.current.y)
+    ImGui.FG:AddLine(_p, _n, 0xFF00FF00, 2.0)
+  end
+  collectgarbage('collect')
+end)
+```
+
+**5. `Json.encode` / `Json.decode`, `runParallel`, and GTPS Redirect (`OnENetInit`):**
+```lua
+local str = Json.encode({{ name = 'Genta', cool = true, age = 21 }})
+local data = Json.decode(str)
+logToConsole(tostring(data.name))
+
+local results = runParallel({{
+  function() return 1 + 1 end,
+  function() return 'done' end
+}})
+logToConsole(tostring(results[1]))
+
+AddHook('OnENetInit', 'gtps_redirect', function(ip, port)
+  setENetInformation('127.0.0.1', 17091)
+  return true
+end)
 ```
 
 ## 9) Ban Risk Rules (first 12)
@@ -356,6 +588,8 @@ if me then logToConsole('Gems: ' .. tostring(me.gems)) end
 3. What is mandatory in infinite loops? → **sleep (random 200-600ms)**
 4. How to enable a mod without writing a script? → **toggleCheat(26, true) / gh_cheat_set('Mod Fly', true)**
 5. Who decides whether a script works? → **ONLY the game executor + lua_logs.txt**
+6. Are Turkish characters (`ğ, ü, ş, ı, ö, ç, İ`) allowed in in-game strings? → **NO, ASCII only (`g, u, s, i, o, c, I`)**
+7. What UI must be included by default unless told otherwise? → **`OnRender` + `ImGui.Begin` control panel**
 
 ## 11) {WATERMARK}
 GENTAHAX MCP v{VERSION} — Trained on real data · Ban-risk warning system · 45 tools

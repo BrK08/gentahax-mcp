@@ -249,7 +249,8 @@ def bolum_b():
     kayit("B02", "gh_farm_script_gen çıktısı (Pepper ID 4570 yerleştirilmiş) derleniyor",
           pre["sonuc"] == "geçti", f"derleme={pre['sonuc']}")
 
-    r = json.loads(S.gh_script_gen.fn("dünyadaki Pepper'ları kır"))
+    _sg = S.gh_script_gen.fn if hasattr(S.gh_script_gen, "fn") else S.gh_script_gen
+    r = json.loads(_sg("dünyadaki Pepper'ları kır"))
     pre = S._syntax_precheck(r["script"])
     kayit("B03", "gh_script_gen çıktısı derleniyor", pre["sonuc"] == "geçti",
           f"derleme={pre['sonuc']}")
@@ -318,7 +319,7 @@ def bolum_c():
                  + [m.group(1) for m in re.finditer(r"`([^`\n]+)`", paket)])
     kod_alani = re.sub(r"--[^\n]*", "", "\n".join(kod_parca))
     # nokta öncesi isimler (tablo.metod) hariç: metod adları stdlib tablolarına aittir
-    adaylar = set(re.findall(r"(?<![\w.])([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", kod_alani))
+    adaylar = set(re.findall(r"(?<![\w.:])([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", kod_alani))
     bilinmeyen = sorted(a for a in adaylar
                         if a not in bilinen and not a.startswith("gh_") and a != "fn")
     n_api = len([a for a in adaylar if a in api_adlari])
@@ -473,7 +474,7 @@ async def bolum_e():
     URL = f"http://127.0.0.1:{PORT}/mcp"
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server.py"), "--http", "--port", str(PORT)],
-        cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     try:
         up = False
         for _ in range(40):
@@ -527,7 +528,7 @@ def bolum_f():
     hepsi_gec = True
     for f in dosyalar:
         cp = subprocess.run([sys.executable, str(f)], capture_output=True, text=True,
-                            cwd=str(ROOT), timeout=600)
+                            cwd=str(ROOT), timeout=600, encoding="utf-8", errors="replace")
         cikti = cp.stdout + cp.stderr
         m = re.search(r"(\d+) başarılı", cikti)
         n = int(m.group(1)) if m else None

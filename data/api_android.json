@@ -78,10 +78,10 @@
     },
     {
       "name": "setTile",
-      "signature": "void setTile(Tile*)",
+      "signature": "void setTile(int x, int y, Tile*)",
       "category": "world",
-      "description": "Tile nesnesini degistirir. Dikkat: sadece istemci tarafinda gecerlidir, sunucu tarafini etkilemez.",
-      "example": "local t = checkTile(0, 0); setTile(t)",
+      "description": "Tile nesnesini ve flaglerini degistirir (setTile(x, y, {fg, bg, setFlags={...}})). Dikkat: sadece istemci tarafinda gecerlidir, sunucu tarafini etkilemez. setFlags alanlari: tileExtra, locked, wasSpliced, willSpawnSeedToo, flipped, enabled, public, silenced, water, glue, burn, red, green, blue.",
+      "example": "setTile(getLocal().pos.x // 32, (getLocal().pos.y // 32) + 1, { fg = 8, bg = 14, setFlags = { tileExtra = false, locked = false, water = true, red = true } })",
       "risk": "low"
     },
     {
@@ -487,6 +487,83 @@
       "description": "Oyuncuyu verilen koordinata yurutur (path finding). BAN RISKI: Imkansiz noktalara yurume/sik istek hareket anomalisi.",
       "example": "findPath(25, 54)",
       "risk": "medium"
+    },
+    {
+      "name": "requestCollectByRange",
+      "signature": "void requestCollectByRange(int range)",
+      "category": "action",
+      "description": "Oyuncunun etrafindaki verilen menzil (tile yaricapi, orn. 4) icindeki yerdeki esyalari toplar. Resmi PNB scriptlerinde kullanilir.",
+      "example": "requestCollectByRange(4)",
+      "risk": "medium"
+    },
+    {
+      "name": "runParallel",
+      "signature": "table runParallel(table{function()})",
+      "category": "thread",
+      "returns": "table (sonuclar)",
+      "description": "Verilen fonksiyon tablosunu ayni oyun tick'i icinde paralel calistirir ve sonuclari tablo olarak dondurur. DIKKAT: Sonuc sirasi belirsiz olabilir. Sonsuz dongu ATMAYIN (cokebilir), sonsuz dongu icin runThread kullanin.",
+      "example": "local results = runParallel({ function() return 1+1 end, function() return 'done' end }); logToConsole(tostring(results[1]))",
+      "risk": "low"
+    },
+    {
+      "name": "setENetInformation",
+      "signature": "void setENetInformation(String ip, int port)",
+      "category": "connection",
+      "description": "OnENetInit hook'u icinde yeni ENet sunucu IP ve port bilgisini ayarlar (VPN'siz GTPS baglantisi icin). Uygulanmasi icin OnENetInit hook fonksiyonu 'return true' donmelidir.",
+      "example": "AddHook('OnENetInit', 'L_0', function(ip, port) setENetInformation('127.0.0.1', 17091); return true end)",
+      "risk": "high"
+    },
+    {
+      "name": "getCachePath",
+      "signature": "String getCachePath()",
+      "category": "useful",
+      "returns": "String",
+      "description": "Oyun onbellek dizin yolunu dondurur.",
+      "example": "logToConsole(getCachePath())",
+      "risk": "low"
+    },
+    {
+      "name": "getSignal",
+      "signature": "int getSignal()",
+      "category": "useful",
+      "returns": "int",
+      "description": "Baglanti sinyal durumunu dondurur.",
+      "example": "logToConsole(tostring(getSignal()))",
+      "risk": "low"
+    },
+    {
+      "name": "ChangeHook",
+      "signature": "void ChangeHook(GentaHook, String HookLabel, function)",
+      "category": "hook",
+      "description": "Var olan bir hook etiketinin fonksiyonunu gunceller.",
+      "example": "ChangeHook('OnVarlist', 'vl', yeniFonksiyon)",
+      "risk": "low"
+    },
+    {
+      "name": "CallHook",
+      "signature": "void CallHook(String HookLabel, ...)",
+      "category": "hook",
+      "description": "Kayitli hook'u manuel tetikler.",
+      "example": "CallHook('vl')",
+      "risk": "low"
+    },
+    {
+      "name": "NewDrawList",
+      "signature": "ImDrawList* NewDrawList()",
+      "category": "ui",
+      "returns": "ImDrawList*",
+      "description": "Yeni ImGui cizim listesi olusturur (ImGui.FG:AddLine / ImGui.BG alternatifidir).",
+      "example": "ImGui.FG:AddLine(worldToScreen(p.x, p.y), worldToScreen(t.x, t.y), 0xFFFFFFFF, 1.0)",
+      "risk": "low"
+    },
+    {
+      "name": "warn",
+      "signature": "void warn(String text)",
+      "category": "logging",
+      "description": "GENTAHAX konsoluna uyari mesaji yazar.",
+      "example": "warn('Dikkat!')",
+      "risk": "low"
     }
-  ]
+  ],
+  "notes": "GENTAHAX v5.61 + Discord official updates + Windows PATCH r1.0 verified"
 }

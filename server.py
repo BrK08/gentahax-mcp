@@ -49,7 +49,9 @@ mcp = FastMCP(
         "sadece okuma yapar, gerçek sayıyı döner, ban riski yoktur. "
         "Kural 6: Hazır mod isteklerinde ('mod fly aç/kapat') gh_cheat_set kullan — script yazma. "
         "Kural 7: 'yaz/çalıştır ve çalışıyor mu bak' isteklerinde gh_auto_test kullan; dönen "
-        "kullaniciya_soz alanını kullanıcıya aynen söyle, HATA'da önerilen yamayla tekrar dene."
+        "kullaniciya_soz alanını kullanıcıya aynen söyle, HATA'da önerilen yamayla tekrar dene. "
+        "Kural 8 (IMGUI VARSAYILAN): Kullanıcı açıkça 'ImGui kullanma' demediği sürece ürettiğin TÜM scriptleri ImGui kontrol panelli (OnRender + ImGui.Begin/Checkbox/SliderInt/Button) olarak tasarla! "
+        "Kural 9 (GROWTOPIA KARAKTER KURALI): Growtopia oyun içinde Türkçe karakterleri (ğ, ü, ş, ı, ö, ç, İ) desteklemez! Oyun içi metinlerde (ImGui, logToConsole, doToast, sendPacket) her zaman ASCII (g, u, s, i, o, c, I) kullan."
     ),
 )
 
@@ -662,7 +664,19 @@ if #targets == 0 then
         tostring(w.name), TARGET, NAME, gems_before, gems_before)
 end
 
--- FAZ B — kirma thread'i (uzun surer; ilerleme ve sonuc lua_logs.txt'ye duser)
+-- FAZ B — ImGui durum paneli + kirma thread'i (uzun surer; ilerleme ve sonuc lua_logs.txt'ye duser)
+local farm_broken = 0
+if AddHook and ImGui then
+    AddHook('OnRender', 'farm_ui_{ID}', function(dt)
+        ImGui.Begin('mr_berk Farm: ' .. NAME)
+        ImGui.TextUnformatted(string.format('Ilerleme: %d / %d (%s)', farm_broken, #targets, NAME))
+        if ImGui.Button('Durdur') then
+            killThread('farm_{ID}')
+            if RemoveHook then pcall(RemoveHook, 'farm_ui_{ID}') end
+        end
+        ImGui.End()
+    end)
+end
 runThread(function()
     local broken = 0
     doLog(string.format('AUTOTEST|START|farm_{ID}|hedef:%d', #targets))
@@ -672,6 +686,7 @@ runThread(function()
             sendPacketRaw(false, { type = 3, state = 16, value = 18,
                                    x = p.x, y = p.y, punchx = p.x, punchy = p.y })
             broken = broken + 1
+            farm_broken = broken
             if broken % 10 == 0 then
                 doLog(string.format('[mr_berk farm] %d/%d %s kirildi', broken, #targets, NAME))
             end
@@ -687,6 +702,7 @@ runThread(function()
         tostring(w.name), TARGET, NAME, #targets, broken, gems_before, gems_after, gems_after - gems_before))
     logToConsole('[mr_berk farm] tamam — rapor lua_logs.txt icinde (gh_logs_read ile oku)')
     doToast(1, 3000, 'Farm bitti (mr_berk)')
+    if RemoveHook then pcall(RemoveHook, 'farm_ui_{ID}') end
 end, 'farm_{ID}')
 
 return string.format('QUEUED|WORLD:%s|TARGET:%d|NAME:%s|FOUND:%d|GEMS_BEFORE:%d|THREAD:farm_{ID}|NOT:kirma_basladi_rapor_icin_gh_logs_read',
@@ -873,7 +889,7 @@ def gh_watermark() -> str:
 
 @mcp.tool
 def gh_learn_lua_gentahax(topic: str = "start") -> str:
-    """Adım adım GENTAHAX Lua eğitim rehberi. topic: start | hooks | packets | cheats | imgui | threads | farming"""
+    """Adım adım GENTAHAX Lua eğitim rehberi. topic: start | hooks | packets | cheats | imgui | threads | farming | pnb | shaders | gfuscator | json | gtps | rules"""
     guides = {
         "start": (
             "GENTAHAX LUA — HIZLI BAŞLANGIÇ (gerçek API):\n"
@@ -947,8 +963,46 @@ def gh_learn_lua_gentahax(topic: str = "start") -> str:
             "4) En iyi şablon: gh_template_get('auto_collect') ve gh_template_get('tree_harvest')\n"
             "⚠️ Tüm adımlar arasına rastgele 200-600ms sleep → bot tespitini azaltır."
         ),
+        "pnb": (
+            "BETTER PNB (Put & Break + requestCollectByRange):\n"
+            "• Popüler blok ID'leri: Chandelier=340, Laser Grid=5666, Pepper Tree=4584, High Tech Block=324, Magic Bell=5990, Sugar Cane=954, Steel Block=186, Bathtub=230\n"
+            "• requestTileChange(x, y, id) ile koy, requestTileChange(x, y, 18) ile kır, requestCollectByRange(4) ile topla.\n"
+            "• Tam şablon: gh_template_get('better_pnb')"
+        ),
+        "shaders": (
+            "CUSTOM SHADERS (main.vert & main.frag):\n"
+            "• Dosya konumu: /android/media/GENTAHAX/Shaders/main.vert ve main.frag\n"
+            "• Örnek kodları okumak için: gh_example_get('main.vert') ve gh_example_get('main.frag') (Fake Chams GLSL shader)."
+        ),
+        "gfuscator": (
+            "GFUSCATOR #region _EXPOSED_ DİREKTİFİ:\n"
+            "• Şifrelenmiş scriptlerde kullanıcıların düzenleyebileceği açık metin ayar bölümü bırakmak için kullanılır:\n"
+            "```lua\n#region _EXPOSED_\ntext = 'The Legion'\n#endregion\nlogToConsole(text)\n```\n"
+            "⚠️ Not: Raw Lua modunda #region yorum/hata sayılır; sadece GFuscator ile şifrelenirken kullanılır!"
+        ),
+        "json": (
+            "JSON PARSER & PARALEL ÇALIŞTIRMA:\n"
+            "• Json.encode(tablo) → JSON string | Json.decode(json_str) → Lua tablosu\n"
+            "• runParallel({ fn1, fn2 }) → aynı oyun tick'inde paralel çalıştırır (ASLA sonsuz döngü koyma; sonsuz döngü için runThread kullan!).\n"
+            "• Tam şablon: gh_template_get('json_and_parallel')"
+        ),
+        "gtps": (
+            "VPN'SİZ GTPS BAĞLANTISI (OnENetInit + setENetInformation):\n"
+            "```lua\nAddHook('OnENetInit', 'L_0', function(ip, port)\n"
+            "  logToConsole('IP: ' .. ip .. ' Port:' .. port)\n"
+            "  setENetInformation('127.0.0.1', 17091)\n"
+            "  return true -- Yeni ENet bilgisini kullanmak icin true dondur!\n"
+            "end)\n```\n"
+            "• Ayrıca hosts örneği için: gh_example_get('example_host.txt')"
+        ),
+        "rules": (
+            "ALTIN KURALLAR (AI & GELİŞTİRİCİ İÇİN):\n"
+            "1) VARSAYILAN IMGUI: Kullanıcı 'ImGui olmasın' demedikçe her scriptte OnRender + ImGui.Begin kontrol paneli kur!\n"
+            "2) GROWTOPIA ASCII KURALI: Oyun içi metinlerde (ImGui, logToConsole, doToast, sendPacket) ASLA Türkçe karakter (ğ, ü, ş, ı, ö, ç, İ) kullanma; Growtopia fontu bunları bozuk gösterir. ASCII karşılıklarını (g, u, s, i, o, c, I) kullan!"
+        # end of topics
+        ),
     }
-    return guides.get(topic, "topic: start | hooks | packets | cheats | imgui | threads | farming")
+    return guides.get(topic, "topic: start | hooks | packets | cheats | imgui | threads | farming | pnb | shaders | gfuscator | json | gtps | rules")
 
 
 # ===========================================================================
@@ -1341,6 +1395,18 @@ local TARGET = {ID}
 local N = {COUNT}
 pcall(function() math.randomseed(os.time()) end)
 runThread(function()
+    local place_done = 0
+    if AddHook and ImGui then
+        AddHook('OnRender', 'gh_place_ui', function(dt)
+            ImGui.Begin('mr_berk Place: {NAME}')
+            ImGui.TextUnformatted(string.format('Koyulan: %d / %d ({NAME})', place_done, N))
+            if ImGui.Button('Durdur') then
+                killThread('gh_place')
+                if RemoveHook then pcall(RemoveHook, 'gh_place_ui') end
+            end
+            ImGui.End()
+        end)
+    end
     doLog(string.format('AUTOTEST|START|place|hedef:%d adet %s', N, '{NAME}'))
     local koyulan = 0
     local cx = math.floor(me.pos.x)
@@ -1352,12 +1418,14 @@ runThread(function()
             if t and (t.fg == 0 or t.fg == nil) then
                 requestTileChange(cx + dx, cy + dy, TARGET)
                 koyulan = koyulan + 1
+                place_done = koyulan
                 sleep(math.random(250, 700))
             end
         end
     end
     doLog(string.format('AUTOTEST|OK|place|koyulan:%d', koyulan))
     logToConsole('mr_berk] place tamam')
+    if RemoveHook then pcall(RemoveHook, 'gh_place_ui') end
 end, 'gh_place')
 return 'QUEUED|place|esya:{NAME}|adet:' .. N
 """
@@ -1527,8 +1595,10 @@ if __name__ == "__main__":
         print("       Claude  : Customize → Connectors → + Add custom connector (No sign in)")
         print("  ⚠️  Tunnel açıkken URL'yi bilen herkes araçları çağırabilir —")
         print("     işin bitince Ctrl+C ile kapat. (gh_run_lua yine güvenli mod + risk analizli)")
+        B.start_http_relay()
         mcp.run(transport="http", host=args.host, port=args.port)
     else:
         print(f"[GENTAHAX MCP — {WATERMARK} edition v{VERSION}] stdio sunucusu başlıyor...",
               file=sys.stderr)
+        B.start_http_relay()
         mcp.run()  # stdio transport (Claude Desktop vb.)

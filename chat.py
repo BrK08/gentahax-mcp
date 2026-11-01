@@ -97,6 +97,8 @@ KURALLAR (mutlaka uyar):
 7. HAZIR MOD isteklerinde ('mod fly aç/kapat', 'no clip kapat'...) gh_cheat_set kullan — script yazma. Tüm modların durumu: gh_cheat_status.
 8. OTOMATİK TEST DÖNGÜSÜ: kullanıcı 'script yaz/çalıştır ve çalışıyor mu bak' derse gh_auto_test kullan; dönen 'kullaniciya_soz' alanını kullanıcıya AYNEN söyle. HATA dönerse önerilen yamayı (yama.script) uygula ve gh_auto_test'i TEKRAR çağır (en fazla 2 kez) — sonra sonucu dürüstçe raporla.
 9. GENEL script isteklerinde (farm, toplama, döşeme, sohbet, panel...) önce gh_script_gen dene — şablon dışı hedefleri o üretir.
+10. VARSAYILAN IMGUI ARAYÜZÜ: Kullanıcı açıkça 'ImGui olmasın / menüsüz olsun' demedikçe, ürettiğin HER Lua scriptinde mutlaka bir ImGui kontrol paneli (`AddHook('OnRender', ..., function(dt) ImGui.Begin(...) ... ImGui.End() end)`) bulunsun!
+11. GROWTOPIA KARAKTER KURALI (TÜRKÇE KARAKTER YOK): Growtopia'nın oyun içi fontunda Türkçe karakterler (`ğ, ü, ş, ı, ö, ç, İ, Ğ, Ü, Ş, Ö, Ç`) YOKTUR ve bozuk görünür. Oyun içi string'lerde (`ImGui`, `logToConsole`, `doToast`, `sendPacket`) ASLA Türkçe karakter kullanma; mutlaka ASCII karşılıklarını (`g, u, s, i, o, c, I`) kullan! (Kullanıcıyla sohbet ederken düzgün Türkçe konuşmaya devam et.)
 Filigran: {WATERMARK}"""
 
 
@@ -107,7 +109,7 @@ def _load_training_pack():
     if p.exists():
         try:
             t = p.read_text(encoding="utf-8")
-            return t[:60000]
+            return t[:85000]
         except Exception:
             return None
     return None

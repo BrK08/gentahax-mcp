@@ -42,7 +42,7 @@
         "name": "OnENetInit",
         "params": "String ip, int port",
         "description": "ENet ag baglantisi kurulurken tetiklenir. Giris/control sunucusu yonlendirmesi burada gorulur. DIKKAT: ip/port degistirmek sunucu yakalamasina (MITM algilama) yol acabilir.",
-        "example": "AddHook('OnENetInit', 'enet', function(ip, port) logToConsole('Baglaniyor: ' .. ip .. ':' .. port) end)"
+        "example": "AddHook('OnENetInit', 'enet', function(ip, port) logToConsole('IP: '..ip..' Port:'..port); setENetInformation('127.0.0.1', 17091); return true end)"
       }
     ],
     "windows": [
@@ -151,7 +151,7 @@
       ]
     },
     "TileFlag": {
-      "fields": ["tileExtra", "locked", "wasSpliced", "willSpawnSeedToo", "seed", "flipped", "enabled", "public", "silenced", "water", "glue", "burn", "painted"]
+      "fields": ["tileExtra", "locked", "wasSpliced", "willSpawnSeedToo", "seed", "flipped", "enabled", "public", "silenced", "water", "glue", "burn", "painted", "red", "green", "blue"]
     },
     "TileExtra": {
       "fields": [

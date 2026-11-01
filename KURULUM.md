@@ -10,6 +10,27 @@
 
 ---
 
+## ⚡ EN HIZLI YOL — Tek Komutla Otomatik Kurulum (`start_mcp.py`)
+
+Hiçbir ayar dosyasıyla uğraşmadan **ChatGPT, Gemini, Claude veya Antigravity**'ye bağlamak için:
+
+```powershell
+git clone https://github.com/BrK08/gentahax-mcp.git
+cd gentahax-mcp
+pip install -r requirements.txt
+python start_mcp.py
+```
+
+1. `python start_mcp.py` komutu Growtopia `Script` klasörünü otomatik bulur, `gentahax_bridge.lua` v2.0 hibrit köprüsünü kurar, `127.0.0.1:8808` MCP sunucusunu + `127.0.0.1:8809` HTTP aktarıcısını başlatır ve ekrana **`https://xxxx.trycloudflare.com/mcp`** adresini basar.
+2. Bu `https://xxxx.trycloudflare.com/mcp` adresini ChatGPT / Gemini / Claude MCP ayarlarına yapıştır.
+3. Oyun içinde GENTAHAX **Script** sekmesinden `gentahax_bridge.lua` dosyasını **Execute** et **VEYA** Lua Executor'a şu tek satırı yapıştırıp çalıştır:
+   ```lua
+   load(makeRequest("http://127.0.0.1:8809/bridge.lua","GET",{},"",5000).content)()
+   ```
+   *(Windows GENTAHAX PATCH r1.0 sürümlerinde `io` kütüphanesi kapalı olsa bile bu hibrit köprü sorunsuz çalışır!)*
+
+---
+
 ## 🔍 Bu nedir? (30 saniyede)
 
 GENTAHAX MCP, yapay zekânı (Claude, Cursor, VS Code Copilot...) **Growtopia GENTAHAX v5.61 script uzmanı** yapan bir köprüdür. Kurduktan sonra AI'ına normal konuşma diliyle şunları yapabilir:
