@@ -82,3 +82,7 @@ Eğer bulut tabanlı bir sohbet arayüzündeysen ve kullanıcının bilgisayarı
    - Kod çalıştırmadan önce `gh_code_analyze` çağır; YÜKSEK ban riski varsa kullanıcıya **"⚠️ BUNDA BAN RİSKİ VAR"** uyarısını göster ve onay almadan `force=true` kullanma.
    - Scripti test etmek için `gh_auto_test` kullan; loglardan (`lua_logs.txt`) gerçek sonucu (`✅ ÇALIŞIYOR` veya hata + otomatik yama) oku.
 6. **Hazır Modlar İçin Script Yazma:** *"Mod Fly aç"*, *"Night Vision aç"* gibi isteklerde script yazma; doğrudan `gh_cheat_set("Mod Fly", true)` aracını çağır.
+7. **KRİTİK C++ MOTOR KURALI (Sıfır Crash / Single-Thread OnRender Mimari):**
+   - GENTAHAX C++ motorunda `OnRender` (OpenGL `SwapBuffers` thread'i) ile `runThread` (arka plan OS thread'i) aynı `lua_State*` stack'ini mutex olmadan paylaşır.
+   - `OnRender` (ImGui) açıkken aynı anda `runThread` içinde yoğun C++ API çağrısı (`checkTile`, `getTile`, `getInventory`, `pcall` vb.) yapılırsa iki thread Lua stack'ini bozar (`attempt to index a number value` ve `[Render Hook] error: error in error handling`) ve oyundan atar (`SIGSEGV`).
+   - Bu yüzden ImGui (`OnRender`) içeren tüm scriptlerde periyodik işlemleri (`findPath`, `requestTileChange`, `checkTile`, `requestCollectByRange`) **ayrı bir `runThread` açmadan**, doğrudan `OnRender(dt)` içinde `timer = timer + (tonumber(dt) or 0.016); if timer >= 0.25 then timer = 0; ... end` (Durum Makinesi / State-Machine) mantığıyla tek thread üzerinde çalıştır ve `pcall` kullanma (`type(t) == "table" or type(t) == "userdata"` kontrolü yap).
