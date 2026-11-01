@@ -13,7 +13,7 @@ KULLANIM:
   python chat.py --list-ai                       # desteklenen AI'leri listele
   python chat.py --check                         # MCP tarafını anahtarsız self-test et
   python chat.py --provider openai  --ask "dirt kaç numara?"
-  python chat.py --provider ollama  --model qwen3:8b   # ücretsiz lokal AI, interaktif
+  python chat.py --provider ollama  --model qwen3.5    # ücretsiz lokal AI, interaktif
   python chat.py --ask "dünyada kaç tane dirt var?"    # env'den ayarları okur
 
 ANAHTARLAR (ortam değişkeni ya da --api-key):
@@ -43,37 +43,37 @@ MAX_RESULT_CHARS = 4000  # araç sonucundan modele gidecek maksimum uzunluk
 # ---------------------------------------------------------------------------
 PROVIDERS = {
     "openai":    {"base": "https://api.openai.com/v1",
-                  "model": "gpt-4.1-mini",
+                  "model": "gpt-5.4",
                   "key_env": "OPENAI_API_KEY",
-                  "hint": "platform.openai.com'dan anahtar (gpt-4.1 / gpt-4.1-mini / gpt-5 / o4-mini)"},
+                  "hint": "platform.openai.com'dan anahtar (gpt-5.4 / gpt-5.4-mini / gpt-5)"},
     "deepseek":  {"base": "https://api.deepseek.com/v1",
                   "model": "deepseek-chat",
                   "key_env": "DEEPSEEK_API_KEY",
-                  "hint": "platform.deepseek.com (DeepSeek V3.2 / deepseek-reasoner R1 — çok ucuz)"},
+                  "hint": "platform.deepseek.com (DeepSeek V4 / V4.1-Flash / deepseek-reasoner — çok ucuz)"},
     "glm":       {"base": "https://open.bigmodel.cn/api/paas/v4",
-                  "model": "glm-4.5-flash",
+                  "model": "glm-5.3",
                   "key_env": "GLM_API_KEY",
-                  "hint": "Z.ai / bigmodel.cn — glm-4.5-flash ÜCRETSİZ katman (glm-4.5 / glm-4-plus destekli)"},
+                  "hint": "Z.ai / bigmodel.cn — glm-5.3 & glm-5.3-flash (ÜCRETSİZ katmanı var)"},
     "gemini":    {"base": "https://generativelanguage.googleapis.com/v1beta/openai",
-                  "model": "gemini-2.5-flash",
+                  "model": "gemini-3.1-pro-preview",
                   "key_env": "GEMINI_API_KEY",
-                  "hint": "Google AI Studio'dan ücretsiz anahtar (gemini-2.5-flash / gemini-2.5-pro)"},
+                  "hint": "Google AI Studio'dan ücretsiz anahtar (gemini-3.1-pro-preview / gemini-3-flash-preview)"},
     "openrouter": {"base": "https://openrouter.ai/api/v1",
-                   "model": "google/gemini-2.5-flash",
+                   "model": "google/gemini-3.1-pro-preview",
                    "key_env": "OPENROUTER_API_KEY",
                    "hint": "tek anahtarla 300+ model"},
     "qwen":      {"base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                  "model": "qwen3-max",
+                  "model": "qwen3.5-plus",
                   "key_env": "DASHSCOPE_API_KEY",
                   "hint": "Alibaba Cloud DashScope"},
     "mistral":   {"base": "https://api.mistral.ai/v1",
-                  "model": "mistral-medium-latest",
+                  "model": "mistral-large-latest",
                   "key_env": "MISTRAL_API_KEY",
                   "hint": "console.mistral.ai"},
     "ollama":    {"base": "http://localhost:11434/v1",
-                  "model": "qwen3:8b",
+                  "model": "qwen3.5",
                   "key_env": None,
-                  "hint": "ÜCRETSİZ + LOKAL: ollama.com indir, 'ollama pull qwen3:8b' (veya llama3.3)"},
+                  "hint": "ÜCRETSİZ + LOKAL: ollama.com indir, 'ollama pull qwen3.5'"},
     "lmstudio":  {"base": "http://localhost:1234/v1",
                   "model": "local-model",
                   "key_env": None,

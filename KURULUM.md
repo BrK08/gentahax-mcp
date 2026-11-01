@@ -210,9 +210,9 @@ python chat.py --ask "dünyada kaç tane dirt var?"
 |---|---|---|
 | `deepseek` | platform.deepseek.com | en ucuz seçeneklerden |
 | `gemini` | aistudio.google.com | **ücretsiz** anahtar |
-| `glm` | bigmodel.cn | glm-4.5-flash ücretsiz katman |
+| `glm` | bigmodel.cn / z.ai | `glm-5.3` & `glm-5.3-flash` ücretsiz katman |
 | `openrouter` | openrouter.ai | tek anahtarla 300+ model |
-| `ollama` | **anahtar YOK** | ollama.com → `ollama pull qwen3:8b` (veya `llama3.3`) — tamamen lokal |
+| `ollama` | **anahtar YOK** | ollama.com → `ollama pull qwen3.5` — tamamen lokal |
 | `lmstudio` | **anahtar YOK** | lmstudio.ai → Developer → sunucuyu aç |
 | `custom` | kendi uçun | `--base-url` + `--model` ile her OpenAI-uyumlu servis |
 

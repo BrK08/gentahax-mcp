@@ -196,19 +196,19 @@ python chat.py --list-ai                          # hangi AI'ler destekli? (10 s
 python chat.py --check                            # anahtarsız MCP self-test (ilk test komutu)
 python chat.py --provider openai  --api-key sk-... --ask "dirt kaç numara?"
 python chat.py --provider deepseek --api-key sk-...                 # interaktif sohbet
-python chat.py --provider ollama  --model qwen3:8b                  # ÜCRETSİZ, lokal, anahtarsız
+python chat.py --provider ollama  --model qwen3.5                   # ÜCRETSİZ, lokal, anahtarsız
 python chat.py --provider custom  --base-url http://localhost:1234/v1 --model benim-modelim
 ```
 
 | Sağlayıcı | Varsayılan model | Anahtar |
 |---|---|---|
-| `openai` | `gpt-4.1-mini` (`gpt-4.1` / `gpt-5` / `o4-mini`) | platform.openai.com |
-| `deepseek` | `deepseek-chat` (V3.2 / `deepseek-reasoner` R1) | platform.deepseek.com (çok ucuz) |
-| `glm` | `glm-4.5-flash` (`glm-4.5` / `glm-4-plus`) | bigmodel.cn — ücretsiz katmanı var |
-| `gemini` | `gemini-2.5-flash` (`gemini-2.5-pro`) | Google AI Studio — ücretsiz anahtar |
-| `openrouter` | `google/gemini-2.5-flash` (300+ güncel model) | tek anahtarla hepsi |
-| `qwen` / `mistral` | `qwen3-max` / `mistral-medium-latest` | DashScope / console.mistral.ai |
-| `ollama` / `lmstudio` | `qwen3:8b` (`llama3.3`) / `local-model` | **ANAHTAR GEREKMEZ** (lokal, ücretsiz) |
+| `openai` | `gpt-5.4` (`gpt-5.4-mini` / `gpt-5`) | platform.openai.com |
+| `deepseek` | `deepseek-chat` (DeepSeek V4 / V4.1-Flash / `deepseek-reasoner`) | platform.deepseek.com (çok ucuz) |
+| `glm` | `glm-5.3` (`glm-5.3-flash` / `glm-5`) | Z.ai / bigmodel.cn — ücretsiz katmanı var |
+| `gemini` | `gemini-3.1-pro-preview` (`gemini-3-flash-preview`) | Google AI Studio — ücretsiz anahtar |
+| `openrouter` | `google/gemini-3.1-pro-preview` (300+ güncel model) | tek anahtarla hepsi |
+| `qwen` / `mistral` | `qwen3.5-plus` / `mistral-large-latest` (Large 4) | DashScope / console.mistral.ai |
+| `ollama` / `lmstudio` | `qwen3.5` / `local-model` | **ANAHTAR GEREKMEZ** (lokal, ücretsiz) |
 | `custom` | sen belirt | herhangi bir OpenAI-uyumlu uç |
 
 `chat.py` arka planda AI ↔ 45 MCP aracı arasında **tool-calling döngüsü** kurar: AI istediği aracı çağırır → gerçek sonuç modele döner → nihai cevap. Güvenlik sistem prompt'a gömülü: AI yüksek riskli kodda `gh_code_analyze` yapıp **"⚠️ BUNDA BAN RİSKİ VAR"** demeden `gh_run_lua` çağıramaz. AI'lar ayrıca [AI_EGITIM.md](AI_EGITIM.md) eğitim paketiyle otomatik başlar (yalnız gerçek veriden üretilir). Kanıt: `tests/test_chat_agent.py` (15/15) + `tests/test_ai_training.py` (38/38).
