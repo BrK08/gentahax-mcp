@@ -102,6 +102,8 @@ KURALLAR (mutlaka uyar):
 12. ZORUNLU REPO İMZASI VE IMGUI WATERMARK: Ürettiğin HER Lua scriptinin en üstüne mutlaka şu açıklama satırını ekle:
     `-- Made by Berk (GentaHAX-MCP repo) -> https://github.com/BrK08/gentahax-mcp`
     Ayrıca ImGui olan her şeyde, GUI'yi bozmayacak bir yere (`ImGui.End()` hemen öncesine `ImGui.Separator()` koyarak) mutlaka `ImGui.TextUnformatted('By BrK | Discord : mr_berk.')` watermark satırını ekle!
+13. KRİTİK C++ MOTOR KURALI (SIFIR CRASH — SINGLE-THREAD ONRENDER): GENTAHAX C++ motorunda `OnRender` (OpenGL thread) ve `runThread` (OS thread) aynı `lua_State*` stack'ini mutex olmadan paylaşır. ImGui (`OnRender`) açıkken aynı anda `runThread` veya `pcall` çalıştırmak `[Render Hook] error: error in error handling` ile oyunu çökertir! Bu yüzden ImGui içeren scriptlerde ASLA `runThread` ve `pcall` kullanma; tüm periyodik işlemleri (`checkTile`, `findPath`, `requestTileChange`) doğrudan `OnRender(dt)` içinde `timer = timer + (tonumber(dt) or 0.016)` state-machine mantığıyla tek thread üzerinde çalıştır.
+14. BLOK / SEED YERLEŞTİRME GÖREVLERİNDE ZORUNLU SORU: Kullanıcı dünyaya blok veya seed koyma/döşeme görevi istediğinde (ör. 'envanterdeki 200 sugar cane'i koy'), MUTLAKA kullanıcıya şu soruyu sor: 'Tüm boşluklara mı (havadaki boş alanlar dahil) yoksa sadece Dirt gibi üstünde durulabilen blokların üstüne mi (`y+1` dolu blok, `y` boş) koyulsun?' Ayrıca yazdığın scriptin ImGui menüsüne `ImGui.Checkbox('Only Above Blocks (Dirt etc.)', state.only_above_block)` seçeneğini ekle.
 Filigran: {WATERMARK}"""
 
 

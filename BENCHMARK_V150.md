@@ -1,9 +1,9 @@
 # GENTAHAX MCP v1.5.0 — GERÇEK BENCHMARK RAPORU (uydurma YOK)
 
-- **Tarih:** 2026-11-01 15:08:33 · **Süre:** 63.7 sn
+- **Tarih:** 2026-11-01 17:29:50 · **Süre:** 113.8 sn
 - **Ortam:** Python 3.12.6 · fastmcp 4.1.4 · lupa: kurulu (derleme kanıtları gerçek Lua motoruyla)
 - **Köprü:** GENTAHAX_SCRIPT_DIR ayarlanMAMIŞ (bu makinede telefon/oyun yok) → canlı executor testi burada FİZİKSEL olarak imkânsız
-- **Sonuç:** **43/43 kanıt geçti**
+- **Sonuç:** **41/43 kanıt geçti** ⚠️ EKSİK KANIT VAR
 
 ## Bu benchmark GERÇEK bir hata BULDU ve düzeltildi
 
@@ -52,7 +52,7 @@ regresyon testi).
 | B04 | OYUN-İÇİ fonksiyonlar (getLocal/toggleCheat/sleep/sendPacketRaw) derlemeyi BOZMAZ — kullanıcının haklı tespiti, kod yoluyla kanıt | ✅ GEÇTİ |
 | B05 | GERÇEK gramer hatası (eksik 'end') yakalanır → executor'a gönderilmeden reddedilir | ✅ GEÇTİ |
 | C01 | AI_EGITIM.md + AI_TRAINING.md, veri dosyalarından üretimle BİREBİR aynı (elle yazılmış/uydurma içerik karışmış olamaz) | ✅ GEÇTİ |
-| C02 | Paketin KOD ALANINDAKİ (lua blokları + backtick imzaları) 87 farklı çağrılabilir ismin TAMAMI gerçek kaynaklı (80 gerçek API + 5 Lua stdlib/kelime + 2 gh_ aracı) — uydurma: SIFIR | ✅ GEÇTİ |
+| C02 | Paketin KOD ALANINDAKİ (lua blokları + backtick imzaları) 89 farklı çağrılabilir ismin TAMAMI gerçek kaynaklı (80 gerçek API + 6 Lua stdlib/kelime + 2 gh_ aracı) — uydurma: SIFIR | ❌ BAŞARISIZ |
 | C03 | Paketteki 62 item-ID satırı + kod örneklerindeki sabitler (Pepper=4570, Dirt=2, Mod Fly=26) gerçek DB/enum ile DOĞRULANDI | ✅ GEÇTİ |
 | C04 | Paketteki 32 hazır mod tablosu CheatCode enum'ının BİREBİR kopyası | ✅ GEÇTİ |
 | C05 | items.json gerçek boyut | ✅ GEÇTİ |
@@ -70,7 +70,7 @@ regresyon testi).
 | E03 | HTTP üzerinden gerçek DB çağrısı (Dirt = 2) çalışır | ✅ GEÇTİ |
 | E04 | HTTP üzerinden gh_auto_test → köprüsüz dürüst CIHAZ_YOK (+ lupa düzeltmesi HTTP yolunda da aktif) | ✅ GEÇTİ |
 | E05 | HTTP üzerinden gh_script_gen → derleme geçti, süreç yaşıyor | ✅ GEÇTİ |
-| F01 | 9 test dosyasının TAMAMI exit=0 ile geçti (sayılabilen 254 assertion + protokol/e2e çağrıları) | ✅ GEÇTİ |
+| F01 | 9 test dosyasının TAMAMI exit=0 ile geçti (sayılabilen 253 assertion + protokol/e2e çağrıları) | ❌ BAŞARISIZ |
 
 ## Bölüm A — Canlı MCP protokolü (gerçek süreç, stdio = Claude Desktop yolu)
 
@@ -101,6 +101,8 @@ Bilgi araçları (Bölüm 1-2) her zaman çalışır; canlı veri için köprü 
 
 ### gh_script_gen('Pepper'ları kır') — script
 ```
+-- Made by Berk (GentaHAX-MCP repo) -> https://github.com/BrK08/gentahax-mcp
+-- By BrK | Discord : mr_berk.
 -- mr_berk GENTAHAX ad-hoc script — 'Dunyadaki tum Pepper bloklarini kir ve cikan gem'i soyle'
 -- Uretildi: gh_farm_script_gen | Hedef ID: 4570 (Pepper) — GERCEK items.dat veritabanindan
 -- RISK: YUKSEK — dongude punch paketi (farm bot paterni). Insan benzeri rastgele delay'ler
@@ -113,8 +115,6 @@ local NAME = 'Pepper'
 -- FAZ A — hizli sayim (senkron, koprunun zaman asimina sigar)
 local w = getWorld()
 if not w then return 'ERR|NO_WORLD' end
-local me = getLocal()
-if not me then return 'ERR|NO_LOCAL' end
 ```
 ```
 
@@ -134,11 +134,11 @@ eksik 'end' kodu   → {"sonuc": "hata", "detay": "[string \"local x = getLocal(
 ### C02 — kod alanındaki çağrılabilir isimler (denetim özeti, gerçek çıktı)
 ```
 denetim kapsamı: lua kod blokları + backtick imza alanları (yorumlar ayıklanmış)
-toplam farklı isim: 87
+toplam farklı isim: 89
 gerçek API veri dosyalarında: 80
-Lua stdlib/anahtar kelime: 5
+Lua stdlib/anahtar kelime: 6
 gh_ MCP araçları: 2
-UYDURMA: 0
+UYDURMA: 1
 ```
 
 ## Bölüm D — Hata sınıflandırma + otomatik yama
@@ -160,7 +160,7 @@ YAMALI KOD DERLEME: geçti
 ### F01 — regresyon dosya dosya (gerçek çıktı)
 ```
 test_adhoc_request.py: GEÇTİ (34 assertion)
-test_ai_training.py: GEÇTİ (38 assertion)
+test_ai_training.py: BAŞARISIZ (37 assertion)
 test_autotest_loop.py: GEÇTİ (50 assertion)
 test_chat_agent.py: GEÇTİ (15 assertion)
 test_cheat_compat.py: GEÇTİ (36 assertion)

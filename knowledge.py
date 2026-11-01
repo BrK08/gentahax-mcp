@@ -333,6 +333,13 @@ def analyze_code(code):
             "Growtopia fontunda (ş, ğ, ü, ı, ö, ç, İ) karakterleri yoktur ve bozuk görünür. "
             "Oyun içi yazılarda (ImGui, logToConsole, doToast, sendPacket) ASCII karşılıklarını (s, g, u, i, o, c, I) kullanın."
         ) if re.search(r"[çğıöşüÇĞİÖŞÜ]", "\n".join(re.findall(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', code))) else None,
+        "crash_warning": (
+            "⚠️ C++ MOTOR CRASH UYARISI (SwapBuffers vs runThread): Kodda hem OnRender/ImGui hem de runThread/pcall "
+            "birlikte kullanılmış! GENTAHAX C++ motorunda OnRender (OpenGL thread) ile runThread (arka plan thread'i) "
+            "aynı lua_State* stack'ini mutex olmadan paylaşır ve '[Render Hook] error: error in error handling' "
+            "hatasıyla oyundan atar. ImGui olan scriptlerde runThread ve pcall KULLANMAYIN; tüm periyodik işlemleri "
+            "OnRender(dt) içinde 'timer = timer + (tonumber(dt) or 0.016)' state-machine mantığıyla tek thread üzerinde çalıştırın!"
+        ) if (("OnRender" in code or "ImGui." in code) and ("runThread(" in code or "pcall(" in code)) else None,
         "analyzed_by": f"{WATERMARK} GENTAHAX MCP risk engine v{VERSION}",
     }
 
