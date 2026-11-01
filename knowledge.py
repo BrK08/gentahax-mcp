@@ -339,7 +339,7 @@ def analyze_code(code):
             "aynı lua_State* stack'ini mutex olmadan paylaşır ve '[Render Hook] error: error in error handling' "
             "hatasıyla oyundan atar. ImGui olan scriptlerde runThread ve pcall KULLANMAYIN; tüm periyodik işlemleri "
             "OnRender(dt) içinde 'timer = timer + (tonumber(dt) or 0.016)' state-machine mantığıyla tek thread üzerinde çalıştırın!"
-        ) if (("OnRender" in code or "ImGui." in code) and ("runThread(" in code or "pcall(" in code)) else None,
+        ) if ((("OnRender" in code or "ImGui." in code) and "runThread(" in code)) else None,
         "analyzed_by": f"{WATERMARK} GENTAHAX MCP risk engine v{VERSION}",
     }
 

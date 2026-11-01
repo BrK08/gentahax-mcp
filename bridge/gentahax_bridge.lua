@@ -101,10 +101,16 @@ local function handle_command(content)
             bridge_append(cmd_id .. "|ERR|" .. tostring(err))
             return true
         end
-        local r1, r2, r3, r4 = chunk()
+        -- Aynı (OnRender) thread içinde korumalı çağrı: AI kodu hata verse bile
+        -- hata Render Hook'a sızmaz, oyun çökmez; hata metni MCP'ye geri döner.
+        local res = table.pack(pcall(chunk))
+        if not res[1] then
+            bridge_append(cmd_id .. "|ERR|" .. tostring(res[2]))
+            return true
+        end
         local parts = {}
-        for _, v in ipairs({r1, r2, r3, r4}) do
-            if v ~= nil then parts[#parts + 1] = tostring(v) end
+        for i = 2, math.min(res.n, 5) do
+            if res[i] ~= nil then parts[#parts + 1] = tostring(res[i]) end
         end
         local out = table.concat(parts, " \t ")
         if out == "" then out = "OK" end
