@@ -329,6 +329,18 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
                     self.wfile.write(data)
+                elif clean_path in ("/scripts/gentahax_mass.lua", "/mass.lua"):
+                    src = Path(__file__).parent / "scripts" / "gentahax_mass.lua"
+                    if src.exists():
+                        data = src.read_text(encoding="utf-8").encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/plain; charset=utf-8")
+                        self.send_header("Content-Length", str(len(data)))
+                        self.end_headers()
+                        self.wfile.write(data)
+                    else:
+                        self.send_response(404)
+                        self.end_headers()
                 elif clean_path.startswith("/screenshot.png") or clean_path.startswith("/world_map.png"):
                     fname = "live_game_screenshot.png" if "screenshot" in clean_path else "live_world_map.png"
                     img_file = d / fname
