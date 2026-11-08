@@ -143,6 +143,28 @@ function mcp_world_snapshot()
     )
 end
 
+function mcp_live_full_status()
+    local w = (type(getWorld) == "function" and getWorld()) or nil
+    local me = (type(getLocal) == "function" and getLocal()) or nil
+    local world_name = (w and w.name) or ""
+    local player_name = (me and me.name) or ""
+    local gems = (me and me.gems) or 0
+    local mass = _G.GH_MASS_ENGINE
+    local state = mass and mass.active_state or 0
+    local statenames = _G.GH_MASS_STATE_NAMES or {}
+    local statename = statenames[state] or "IDLE"
+    local cap = mass and mass.scanned_capacity or 0
+    local planted = mass and mass.plant_index or 0
+    local rem = mass and mass.growth_remaining or 0
+    local ready = (mass and mass.ready_to_harvest) or false
+    local drop_w = (mass and mass.drop_zone and mass.drop_zone.world) or ""
+    local drop_x = (mass and mass.drop_zone and mass.drop_zone.x) or 0
+    local drop_y = (mass and mass.drop_zone and mass.drop_zone.y) or 0
+    local drop_c = (mass and mass.drop_zone and mass.drop_zone.count) or 0
+    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d",
+        world_name, player_name, gems, state, statename, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c)
+end
+
 function mcp_player_info()
     local list = getPlayerlist()
     local out = {}

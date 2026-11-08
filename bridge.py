@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 import re
 from typing import Any, Dict, Optional, Tuple
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -138,17 +138,95 @@ def parse_stock_payload(raw_stock: Any) -> Dict[int, int]:
     return result
 
 _LIVE_MASS_STATE = {
-    "world": "GROW_FARM1",
-    "player": "mr_berk",
-    "gems": 12450,
-    "bridge_connected": True,
+    "world": "DISCONNECTED",
+    "player": "DISCONNECTED",
+    "gems": 0,
+    "bridge_connected": False,
     "bot_phase": "IDLE",
-    "scanned_capacity": 300,
+    "scanned_capacity": 0,
     "planted_count": 0,
     "growth_remaining_seconds": 0,
-    "is_ready_to_harvest": True,
-    "drop_zone": {"world": "DROP_VAULT", "x": 50, "y": 23, "count": 1840, "limit": 5000}
+    "is_ready_to_harvest": False,
+    "drop_zone": {"world": "", "x": 0, "y": 0, "count": 0, "limit": 5000}
 }
+
+_LAST_SYNC_TIME = 0.0
+_SYNC_LOCK = threading.Lock()
+
+
+def sync_live_game_state(force: bool = False) -> Dict[str, Any]:
+    """Queries real live game state from GentaHAX Lua bridge with 1.0s caching."""
+    global _LAST_SYNC_TIME
+    now = time.time()
+    if not force and (now - _LAST_SYNC_TIME) < 1.0:
+        with _STATE_LOCK:
+            return dict(_LIVE_MASS_STATE)
+
+    with _SYNC_LOCK:
+        if not force and (now - _LAST_SYNC_TIME) < 1.0:
+            with _STATE_LOCK:
+                return dict(_LIVE_MASS_STATE)
+
+        d = script_dir() or auto_detect_script_dir()
+        if not d and not adb_enabled():
+            with _STATE_LOCK:
+                _LIVE_MASS_STATE["bridge_connected"] = False
+                _LIVE_MASS_STATE["world"] = "DISCONNECTED"
+                _LIVE_MASS_STATE["player"] = "DISCONNECTED"
+                _LIVE_MASS_STATE["gems"] = 0
+            _LAST_SYNC_TIME = now
+            return dict(_LIVE_MASS_STATE)
+
+        try:
+            # Query live game state from GentaHAX Lua bridge (mcp_live_full_status or mcp_world_snapshot)
+            code = "return (type(mcp_live_full_status)=='function' and mcp_live_full_status()) or (type(mcp_world_snapshot)=='function' and mcp_world_snapshot()) or 'NONE'"
+            raw = exec_lua(code, timeout=1.5)
+            if raw and "WORLD:" in raw:
+                fields = {}
+                for part in raw.split("|"):
+                    if ":" in part:
+                        k, v = part.split(":", 1)
+                        fields[k.strip()] = v.strip()
+
+                w_name = fields.get("WORLD", "").strip()
+                p_name = fields.get("ME", "").strip()
+                gems_val = sanitize_int(fields.get("GEMS", 0), default=0, min_val=0)
+                st_name = fields.get("STATENAME", "IDLE")
+                cap_val = sanitize_int(fields.get("CAP", 0), default=0, min_val=0)
+                planted_val = sanitize_int(fields.get("PLANTED", 0), default=0, min_val=0)
+                rem_val = sanitize_int(fields.get("REM", 0), default=0, min_val=0)
+                ready_val = sanitize_bool(fields.get("READY", False))
+
+                with _STATE_LOCK:
+                    _LIVE_MASS_STATE["bridge_connected"] = True
+                    _LIVE_MASS_STATE["world"] = w_name if (w_name and "Dunya yok" not in w_name) else "MENU (No World)"
+                    _LIVE_MASS_STATE["player"] = p_name if (p_name and p_name != "?") else "Unknown"
+                    _LIVE_MASS_STATE["gems"] = gems_val
+                    _LIVE_MASS_STATE["bot_phase"] = st_name
+                    if cap_val > 0:
+                        _LIVE_MASS_STATE["scanned_capacity"] = cap_val
+                    _LIVE_MASS_STATE["planted_count"] = planted_val
+                    _LIVE_MASS_STATE["growth_remaining_seconds"] = rem_val
+                    _LIVE_MASS_STATE["is_ready_to_harvest"] = ready_val
+                    if fields.get("DROPW"):
+                        _LIVE_MASS_STATE["drop_zone"]["world"] = fields["DROPW"]
+                        _LIVE_MASS_STATE["drop_zone"]["x"] = sanitize_int(fields.get("DROPX", 0), default=0)
+                        _LIVE_MASS_STATE["drop_zone"]["y"] = sanitize_int(fields.get("DROPY", 0), default=0)
+                        _LIVE_MASS_STATE["drop_zone"]["count"] = sanitize_int(fields.get("DROPC", 0), default=0)
+            else:
+                with _STATE_LOCK:
+                    _LIVE_MASS_STATE["bridge_connected"] = False
+                    _LIVE_MASS_STATE["world"] = "DISCONNECTED"
+                    _LIVE_MASS_STATE["player"] = "DISCONNECTED"
+        except Exception:
+            with _STATE_LOCK:
+                _LIVE_MASS_STATE["bridge_connected"] = False
+                _LIVE_MASS_STATE["world"] = "DISCONNECTED"
+                _LIVE_MASS_STATE["player"] = "DISCONNECTED"
+
+        _LAST_SYNC_TIME = now
+        with _STATE_LOCK:
+            return dict(_LIVE_MASS_STATE)
 
 
 def extract_genuine_sprite(item_id: int):
@@ -183,8 +261,27 @@ def generate_procedural_sprite(item_id: int, item_name: str = "") -> Image.Image
     return img
 
 
+def _fetch_wiki_sprite_async(item_id: int, safe_name: str, disk_file: Path):
+    """Background worker to download sprite from wiki without blocking HTTP requests."""
+    try:
+        wiki_url = f"https://growtopia.fandom.com/wiki/Special:FilePath/{urllib.parse.quote(safe_name)}.png"
+        req = urllib.request.Request(wiki_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            if resp.status == 200:
+                raw = resp.read()
+                wiki_img = Image.open(io.BytesIO(raw)).convert("RGBA")
+                sprite_img = wiki_img.resize((32, 32), Image.Resampling.NEAREST)
+                buf = io.BytesIO()
+                sprite_img.save(buf, format="PNG")
+                png_data = buf.getvalue()
+                disk_file.write_bytes(png_data)
+                _SPRITE_CACHE[item_id] = png_data
+    except Exception:
+        pass
+
+
 def get_item_sprite_png_bytes(item_id: int, item_name: str = "") -> bytes:
-    """Multi-tier 32x32 sprite provider: Memory -> Disk -> .rttex -> Wiki CDN -> Procedural."""
+    """Multi-tier non-blocking 32x32 sprite provider: Memory -> Disk -> .rttex -> Procedural (instant)."""
     if item_id in _SPRITE_CACHE:
         return _SPRITE_CACHE[item_id]
 
@@ -202,33 +299,23 @@ def get_item_sprite_png_bytes(item_id: int, item_name: str = "") -> bytes:
     # Tier 1: Local .rttex
     sprite_img = extract_genuine_sprite(item_id)
 
-    # Tier 2: Wiki CDN Fallback
+    # Tier 2: Instant Procedural Vector Graphic (<0.1ms latency) + Async Background Wiki Download
     if sprite_img is None:
-        try:
-            name_to_use = item_name
-            if not name_to_use:
-                try:
-                    import mass_tracer as MT
-                    target_info = MT.tracer.resolve_target(str(item_id))
-                    if target_info:
-                        name_to_use = target_info[2]
-                except Exception:
-                    pass
+        name_to_use = item_name
+        if not name_to_use:
+            try:
+                import mass_tracer as MT
+                target_info = MT.tracer.resolve_target(str(item_id))
+                if target_info:
+                    name_to_use = target_info[2]
+            except Exception:
+                pass
 
-            if name_to_use:
-                safe_name = name_to_use.replace(" ", "_")
-                wiki_url = f"https://growtopia.fandom.com/wiki/Special:FilePath/{urllib.parse.quote(safe_name)}.png"
-                req = urllib.request.Request(wiki_url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=3.0) as resp:
-                    if resp.status == 200:
-                        raw = resp.read()
-                        wiki_img = Image.open(io.BytesIO(raw)).convert("RGBA")
-                        sprite_img = wiki_img.resize((32, 32), Image.Resampling.NEAREST)
-        except Exception:
-            sprite_img = None
+        if name_to_use:
+            safe_name = name_to_use.replace(" ", "_")
+            th = threading.Thread(target=_fetch_wiki_sprite_async, args=(item_id, safe_name, disk_file), daemon=True)
+            th.start()
 
-    # Tier 3: Procedural Vector Fallback
-    if sprite_img is None:
         sprite_img = generate_procedural_sprite(item_id, item_name)
 
     buf = io.BytesIO()
@@ -364,7 +451,8 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.end_headers()
                     self.wfile.write(data)
                 elif clean_path == "/mass/data":
-                    data = json.dumps(_LIVE_MASS_STATE, ensure_ascii=False).encode("utf-8")
+                    live_dict = sync_live_game_state()
+                    data = json.dumps(live_dict, ensure_ascii=False).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Access-Control-Allow-Origin", "*")
@@ -511,6 +599,11 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                                 only_above = sanitize_bool(payload.get("only_above_block", True))
                                 cap = sanitize_int(payload.get("capacity", 300), default=300, min_val=1, max_val=10_000)
                                 _LIVE_MASS_STATE["scanned_capacity"] = cap
+                                try:
+                                    code = f"if _G.GH_MASS_ENGINE then _G.GH_MASS_ENGINE.only_above_block = {'true' if only_above else 'false'}; _G.GH_MASS_ENGINE.active_state = 2; return 'OK' end return 'NO_ENGINE'"
+                                    exec_lua(code, timeout=1.0)
+                                except Exception:
+                                    pass
                                 resp_data = {
                                     "ok": True,
                                     "capacity": cap,
@@ -519,6 +612,11 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                                 }
                             elif action == "trigger_harvest":
                                 _LIVE_MASS_STATE["bot_phase"] = "HARVESTING"
+                                try:
+                                    code = "if _G.GH_MASS_ENGINE then _G.GH_MASS_ENGINE.active_state = 11; return 'OK' end return 'NO_ENGINE'"
+                                    exec_lua(code, timeout=1.0)
+                                except Exception:
+                                    pass
                                 resp_data = {
                                     "ok": True,
                                     "message": "Harvest dispatched to GentaHAX state machine! Pathfinding to mature trees."
@@ -593,7 +691,7 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.end_headers()
 
         try:
-            srv = HTTPServer(("127.0.0.1", port), _RelayHandler)
+            srv = ThreadingHTTPServer(("127.0.0.1", port), _RelayHandler)
             th = threading.Thread(target=srv.serve_forever, daemon=True, name="gh_http_relay")
             th.start()
             _RELAY_STARTED = True

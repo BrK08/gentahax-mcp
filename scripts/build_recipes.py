@@ -342,6 +342,67 @@ def build_recipes():
             }
             by_seed_id[str(s_id)] = b_id
 
+    # 3. Add all remaining items from CoreData.txt & items.json (ensuring 100% complete database of all GT items)
+    for iid, c_info in sorted(core_items.items()):
+        b_str = str(iid)
+        if b_str not in items_out:
+            s_id = item_to_seed.get(iid, iid + 1 if (str(iid + 1) in items_db and items_db[str(iid + 1)].endswith(" Seed")) else iid)
+            name = c_info.get("name", get_item_name(iid))
+            s_name = get_seed_name(s_id) if s_id != iid else name
+            growth = c_info.get("growth_seconds", 0)
+            if growth == 0 and s_id in core_items:
+                growth = core_items[s_id].get("growth_seconds", 0)
+            items_out[b_str] = {
+                "item_id": iid,
+                "name": name,
+                "seed_id": s_id,
+                "seed_name": s_name,
+                "rarity": c_info.get("rarity", 1),
+                "tier": 1,
+                "category": c_info.get("category", "Item"),
+                "growth_seconds": growth,
+                "growth_formatted": format_duration(growth),
+                "max_fruit_drop": max_drops.get(iid, 4),
+                "colors": {
+                    "base": c_info.get("base_color", "FFFFFF"),
+                    "overlay": c_info.get("overlay_color", "FFFFFF")
+                },
+                "recipe": {
+                    "type": "TERMINAL_LEAF",
+                    "is_multi_output": False,
+                    "output_siblings": [],
+                    "ingredients": []
+                }
+            }
+            by_seed_id[str(s_id)] = iid
+
+    for iid_str, raw_name in sorted(items_db.items(), key=lambda x: int(x[0])):
+        if iid_str not in items_out:
+            iid = int(iid_str)
+            s_id = item_to_seed.get(iid, iid + 1 if (str(iid + 1) in items_db and items_db[str(iid + 1)].endswith(" Seed")) else iid)
+            clean_name = re.sub(r"\s+", " ", raw_name).strip()
+            s_name = get_seed_name(s_id) if s_id != iid else clean_name
+            items_out[iid_str] = {
+                "item_id": iid,
+                "name": clean_name,
+                "seed_id": s_id,
+                "seed_name": s_name,
+                "rarity": 1,
+                "tier": 1,
+                "category": "Item",
+                "growth_seconds": 0,
+                "growth_formatted": "Instant",
+                "max_fruit_drop": 4,
+                "colors": {"base": "FFFFFF", "overlay": "FFFFFF"},
+                "recipe": {
+                    "type": "TERMINAL_LEAF",
+                    "is_multi_output": False,
+                    "output_siblings": [],
+                    "ingredients": []
+                }
+            }
+            by_seed_id[str(s_id)] = iid
+
     # Deduplicate by_ingredient lists
     for k in by_ingredient:
         by_ingredient[k] = sorted(list(set(by_ingredient[k])))

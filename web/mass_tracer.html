@@ -321,15 +321,13 @@
       display: block;
     }
 
-    /* SVG Keyframes & Styles */
+    /* SVG Keyframes & Styles — Hardware Accelerated */
     @keyframes emeraldPulseGlow {
       0%, 100% {
         stroke: #10B981;
-        filter: drop-shadow(0 0 4px #10B981) drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
       }
       50% {
         stroke: #34D399;
-        filter: drop-shadow(0 0 8px #34D399) drop-shadow(0 0 16px rgba(52, 211, 153, 0.9));
       }
     }
 
@@ -341,11 +339,11 @@
     .dag-edge-active {
       fill: none;
       stroke: #10B981;
-      stroke-width: 3.5px;
+      stroke-width: 3px;
       stroke-linecap: round;
       stroke-linejoin: round;
-      stroke-dasharray: 12 6;
-      animation: dashFlowDirection 1.2s linear infinite, emeraldPulseGlow 2.4s ease-in-out infinite;
+      stroke-dasharray: 10 5;
+      animation: dashFlowDirection 1.5s linear infinite, emeraldPulseGlow 2.4s ease-in-out infinite;
       marker-end: url(#arrow-active);
     }
 
@@ -720,20 +718,20 @@
 
     <div class="status-badges">
       <div class="badge">
-        <span class="bridge-indicator"></span>
-        <span id="badgeBridge">BRIDGE: CONNECTED</span>
+        <span class="bridge-indicator" id="bridgeIndicator"></span>
+        <span id="badgeBridge">BRIDGE: CHECKING...</span>
       </div>
       <div class="badge">
         <span>WORLD:</span>
-        <strong id="badgeWorld" style="color:#38BDF8;">GROW_FARM1</strong>
+        <strong id="badgeWorld" style="color:#38BDF8;">---</strong>
       </div>
       <div class="badge">
         <span>PLAYER:</span>
-        <strong id="badgePlayer" style="color:#F59E0B;">mr_berk</strong>
+        <strong id="badgePlayer" style="color:#F59E0B;">---</strong>
       </div>
       <div class="badge">
         <span>💎</span>
-        <strong id="badgeGems" style="color:#F43F5E;">12,450</strong>
+        <strong id="badgeGems" style="color:#F43F5E;">0</strong>
       </div>
     </div>
   </header>
@@ -743,7 +741,7 @@
     <!-- Search Box -->
     <div class="search-box">
       <span class="search-icon">🔍</span>
-      <input type="text" id="targetSearch" placeholder="Search 8,284 items (e.g. Chandelier, Rock, 5666)..." autocomplete="off">
+      <input type="text" id="targetSearch" placeholder="Search 7,558+ items (e.g. Chandelier, Rock, 5666, Pepper)..." autocomplete="off">
       <div class="autocomplete-list" id="autocompleteList"></div>
     </div>
 
@@ -1108,10 +1106,7 @@
         rect.setAttribute("rx", "10");
         rect.setAttribute("fill", isAct ? "#0B1329" : "#0A0F1D");
         rect.setAttribute("stroke", isAct ? "#10B981" : "#1E293B");
-        rect.setAttribute("stroke-width", isAct ? "2.2" : "1");
-        if (isAct) {
-          rect.setAttribute("style", "filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.35));");
-        }
+        rect.setAttribute("stroke-width", isAct ? "2.5" : "1");
         g.appendChild(rect);
 
         // Sprite Frame
@@ -1305,51 +1300,55 @@
       viewportGroup.setAttribute("transform", `translate(${panX}, ${panY}) scale(${zoomLevel})`);
     }
 
-    // Autocomplete
+    // Autocomplete with Debounce (Lag-Free)
     function setupAutocomplete() {
       const input = document.getElementById("targetSearch");
       const list = document.getElementById("autocompleteList");
+      let debounceTimer = null;
 
-      input.addEventListener("input", async () => {
-        const val = input.value.trim();
-        if (val.length < 2) {
-          list.style.display = "none";
-          return;
-        }
-
-        try {
-          const resp = await fetch(`/mass/recipes?query=${encodeURIComponent(val)}&limit=10`);
-          const d = await resp.json();
-          const recipes = d.recipes || [];
-
-          if (recipes.length === 0) {
+      input.addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+          const val = input.value.trim();
+          if (val.length < 2) {
             list.style.display = "none";
             return;
           }
 
-          list.innerHTML = "";
-          recipes.forEach(r => {
-            const item = document.createElement("div");
-            item.className = "autocomplete-item";
-            item.innerHTML = `
-              <img src="/sprite/${r.item_id}.png" onerror="this.src='/sprite/2.png'">
-              <div>
-                <strong>${r.name}</strong> (Seed ID: ${r.seed_id}) — Tier ${r.tier}<br>
-                <span style="color:var(--text-muted); font-size:10px;">Grow: ${r.growth_formatted}</span>
-              </div>
-            `;
-            item.onclick = () => {
-              input.value = r.name;
+          try {
+            const resp = await fetch(`/mass/recipes?query=${encodeURIComponent(val)}&limit=12`);
+            const d = await resp.json();
+            const recipes = d.recipes || [];
+
+            if (recipes.length === 0) {
               list.style.display = "none";
-              currentTarget = r.name;
-              loadTrace(currentTarget, currentCapacity);
-            };
-            list.appendChild(item);
-          });
-          list.style.display = "block";
-        } catch (e) {
-          console.error(e);
-        }
+              return;
+            }
+
+            list.innerHTML = "";
+            recipes.forEach(r => {
+              const item = document.createElement("div");
+              item.className = "autocomplete-item";
+              item.innerHTML = `
+                <img src="/sprite/${r.item_id}.png" onerror="this.src='/sprite/2.png'">
+                <div>
+                  <strong>${r.name}</strong> (Seed ID: ${r.seed_id}) — Tier ${r.tier}<br>
+                  <span style="color:var(--text-muted); font-size:10px;">Grow: ${r.growth_formatted} | Rarity: ${r.rarity}</span>
+                </div>
+              `;
+              item.onclick = () => {
+                input.value = r.name;
+                list.style.display = "none";
+                currentTarget = r.name;
+                loadTrace(currentTarget, currentCapacity);
+              };
+              list.appendChild(item);
+            });
+            list.style.display = "block";
+          } catch (e) {
+            console.error(e);
+          }
+        }, 200);
       });
 
       document.addEventListener("click", e => {
@@ -1405,39 +1404,64 @@
       alert("Current standing tile set as designated drop zone!");
     }
 
-    // Live State Polling
-    function startPolling() {
-      setInterval(async () => {
-        try {
-          const resp = await fetch("/mass/data");
-          if (!resp.ok) return;
-          const data = await resp.json();
-          liveState = data;
+    // Real Live State Polling (100% Genuine In-Game State)
+    async function pollLiveState() {
+      try {
+        const resp = await fetch("/mass/data");
+        if (!resp.ok) return;
+        const data = await resp.json();
+        liveState = data;
 
-          if (data.world) document.getElementById("badgeWorld").textContent = data.world;
-          if (data.player) document.getElementById("badgePlayer").textContent = data.player;
-          if (data.gems !== undefined) document.getElementById("badgeGems").textContent = data.gems.toLocaleString();
+        const bridgeInd = document.getElementById("bridgeIndicator");
+        const badgeBridge = document.getElementById("badgeBridge");
+        const badgeWorld = document.getElementById("badgeWorld");
+        const badgePlayer = document.getElementById("badgePlayer");
+        const badgeGems = document.getElementById("badgeGems");
 
-          // Maturation
-          const rem = data.growth_remaining_seconds || 0;
-          if (rem > 0) {
-            const h = String(Math.floor(rem / 3600)).padStart(2, '0');
-            const m = String(Math.floor((rem % 3600) / 60)).padStart(2, '0');
-            const s = String(rem % 60).padStart(2, '0');
-            document.getElementById("hudCountdown").textContent = `${h}:${m}:${s}`;
-            document.getElementById("hudStatusDesc").textContent = "Growing Trees in Farm World...";
-            document.getElementById("btnHarvest").className = "harvest-btn disabled";
-            document.getElementById("btnHarvest").textContent = "Growing (Bekleniyor)...";
-          } else {
-            document.getElementById("hudCountdown").textContent = "00:00:00";
-            document.getElementById("hudStatusDesc").textContent = "Trees Ready for Harvest!";
-            document.getElementById("btnHarvest").className = "harvest-btn ready";
-            document.getElementById("btnHarvest").textContent = "⚡ HARVEST ET (Hemen Başlat)";
+        if (data.bridge_connected) {
+          if (bridgeInd) {
+            bridgeInd.style.background = "#10B981";
+            bridgeInd.style.boxShadow = "0 0 8px #10B981";
           }
-        } catch (e) {
-          // silent error in polling
+          if (badgeBridge) badgeBridge.textContent = "BRIDGE: CONNECTED (LIVE)";
+          if (badgeWorld) badgeWorld.textContent = data.world || "MENU";
+          if (badgePlayer) badgePlayer.textContent = data.player || "Player";
+          if (badgeGems && data.gems !== undefined) badgeGems.textContent = data.gems.toLocaleString();
+        } else {
+          if (bridgeInd) {
+            bridgeInd.style.background = "#EF4444";
+            bridgeInd.style.boxShadow = "none";
+          }
+          if (badgeBridge) badgeBridge.textContent = "BRIDGE: OFFLINE";
+          if (badgeWorld) badgeWorld.textContent = "DISCONNECTED";
+          if (badgePlayer) badgePlayer.textContent = "DISCONNECTED";
+          if (badgeGems) badgeGems.textContent = "0";
         }
-      }, 3000);
+
+        // Maturation
+        const rem = data.growth_remaining_seconds || 0;
+        if (rem > 0) {
+          const h = String(Math.floor(rem / 3600)).padStart(2, '0');
+          const m = String(Math.floor((rem % 3600) / 60)).padStart(2, '0');
+          const s = String(rem % 60).padStart(2, '0');
+          document.getElementById("hudCountdown").textContent = `${h}:${m}:${s}`;
+          document.getElementById("hudStatusDesc").textContent = "Growing Trees in Farm World...";
+          document.getElementById("btnHarvest").className = "harvest-btn disabled";
+          document.getElementById("btnHarvest").textContent = "Growing (Bekleniyor)...";
+        } else {
+          document.getElementById("hudCountdown").textContent = "00:00:00";
+          document.getElementById("hudStatusDesc").textContent = "Trees Ready for Harvest!";
+          document.getElementById("btnHarvest").className = "harvest-btn ready";
+          document.getElementById("btnHarvest").textContent = "⚡ HARVEST ET (Hemen Başlat)";
+        }
+      } catch (e) {
+        // silent error in polling
+      }
+    }
+
+    function startPolling() {
+      pollLiveState(); // Immediate fetch on page load
+      setInterval(pollLiveState, 2000);
     }
   </script>
 </body>

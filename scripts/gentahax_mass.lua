@@ -56,10 +56,10 @@ local GH_ENGINE = {
     current_time = 0,
     status_message = "Engine initialized in IDLE state.",
     
-    -- Configuration
-    farm_world = "GROW_FARM1",
-    storage_world_a = "SEED_VAULT_A",
-    storage_world_b = "SEED_VAULT_B",
+    -- Configuration (automatically defaults to current world if in-game)
+    farm_world = (type(getWorld) == "function" and getWorld() and getWorld().name) or "",
+    storage_world_a = "",
+    storage_world_b = "",
     seed_a_id = 3,       -- Dirt Seed
     seed_b_id = 5,       -- Lava Seed
     target_tree_id = 101, -- Wood Tree Seed
@@ -83,7 +83,7 @@ local GH_ENGINE = {
     
     -- Designated Drop Zone (Safe threshold 5000 under 5500 GT hard ceiling)
     drop_zone = {
-        world = "DROP_VAULT",
+        world = "",
         x = 50,
         y = 23,
         count = 0,
@@ -110,6 +110,30 @@ local GH_ENGINE = {
         mod_name = ""
     }
 }
+
+-- Global Export for MCP Bridge IPC
+_G.GH_MASS_ENGINE = GH_ENGINE
+_G.GH_MASS_STATE_NAMES = STATE_NAMES
+
+function gh_get_live_mass_state()
+    local w = type(getWorld) == "function" and getWorld()
+    local me = type(getLocal) == "function" and getLocal()
+    local world_name = (w and w.name) or ""
+    local player_name = (me and me.name) or ""
+    local gems = (me and me.gems) or 0
+    local state = GH_ENGINE.active_state or 0
+    local state_name = (STATE_NAMES and STATE_NAMES[state]) or "STATE_0: IDLE"
+    local cap = GH_ENGINE.scanned_capacity or 0
+    local planted = GH_ENGINE.plant_index or 0
+    local rem = GH_ENGINE.growth_remaining or 0
+    local ready = GH_ENGINE.ready_to_harvest or false
+    local drop_w = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.world) or ""
+    local drop_x = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.x) or 0
+    local drop_y = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.y) or 0
+    local drop_c = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.count) or 0
+    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d",
+        world_name, player_name, gems, state, state_name, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c)
+end
 
 -- ------------------------------------------------------------------------------
 -- 3. PURE LUA EMBEDDED JSON SERIALIZER & PARSER (ZERO EXTERNAL DEPENDENCY)
