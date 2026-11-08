@@ -5,3 +5,10 @@ bridge_in.txt
 bridge_out.txt
 lua_logs.txt
 .DS_Store
+.cache/
+data/.cache/
+
+# Mass engine runtime state
+mass_state.json
+bridge/mass_state.json
+.agents/

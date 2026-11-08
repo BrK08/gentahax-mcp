@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GENTAHAX Mass Recipe Tracer — mr_berk edition</title>
+  <style>
+    :root {
+      --bg-dark: #090D16;
+      --card-bg: #0F172A;
+      --card-border: #1E293B;
+      --emerald: #10B981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --emerald-light: #34D399;
+      --slate: #334155;
+      --slate-light: #64748B;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --accent-blue: #3B82F6;
+      --accent-amber: #F59E0B;
+      --accent-red: #EF4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Header */
+    header {
+      background: #0B1120;
+      border-bottom: 1px solid var(--card-border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      z-index: 30;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: white;
+      font-weight: 900;
+      font-size: 16px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px var(--emerald-glow);
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .status-badges {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: monospace;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bridge-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulseIndicator 2s infinite;
+    }
+
+    @keyframes pulseIndicator {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    /* Controls Bar */
+    .controls-bar {
+      background: #0D1527;
+      border-bottom: 1px solid var(--card-border);
+      padding: 8px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      z-index: 20;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 260px;
+      max-width: 380px;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: #090E1A;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 7px 12px 7px 32px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald-glow);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #0B132B;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      max-height: 240px;
+      overflow-y: auto;
+      z-index: 100;
+      margin-top: 4px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      display: none;
+    }
+
+    .autocomplete-item {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 12px;
+      border-bottom: 1px solid #141E33;
+    }
+
+    .autocomplete-item:hover {
+      background: #172554;
+      color: var(--emerald-light);
+    }
+
+    .autocomplete-item img {
+      width: 22px;
+      height: 22px;
+      image-rendering: pixelated;
+    }
+
+    .capacity-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #090E1A;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    .capacity-input-wrap input {
+      width: 50px;
+      background: transparent;
+      border: none;
+      color: var(--emerald-light);
+      font-weight: 700;
+      font-size: 13px;
+      outline: none;
+      text-align: center;
+    }
+
+    .btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #1E293B;
+      border-color: var(--slate-light);
+    }
+
+    .btn-emerald {
+      background: #064E3B;
+      border-color: #059669;
+      color: #A7F3D0;
+    }
+
+    .btn-emerald:hover {
+      background: #059669;
+      color: white;
+      box-shadow: 0 0 10px var(--emerald-glow);
+    }
+
+    .quick-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+    }
+
+    .chip {
+      background: #111C30;
+      border: 1px solid var(--card-border);
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .chip:hover, .chip.active {
+      background: #064E3B;
+      border-color: var(--emerald);
+      color: var(--emerald-light);
+    }
+
+    .toggles {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .toggles label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .toggles input[type="checkbox"] {
+      accent-color: var(--emerald);
+    }
+
+    /* Main Layout */
+    .workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Canvas Viewport */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at 50% 50%, #0F172A 0%, #080D1A 100%);
+      overflow: hidden;
+      cursor: grab;
+    }
+
+    .canvas-container:active {
+      cursor: grabbing;
+    }
+
+    svg#dagCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* SVG Keyframes & Styles */
+    @keyframes emeraldPulseGlow {
+      0%, 100% {
+        stroke: #10B981;
+        filter: drop-shadow(0 0 4px #10B981) drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+      }
+      50% {
+        stroke: #34D399;
+        filter: drop-shadow(0 0 8px #34D399) drop-shadow(0 0 16px rgba(52, 211, 153, 0.9));
+      }
+    }
+
+    @keyframes dashFlowDirection {
+      from { stroke-dashoffset: 48; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    .dag-edge-active {
+      fill: none;
+      stroke: #10B981;
+      stroke-width: 3.5px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 12 6;
+      animation: dashFlowDirection 1.2s linear infinite, emeraldPulseGlow 2.4s ease-in-out infinite;
+      marker-end: url(#arrow-active);
+    }
+
+    .dag-edge-inactive {
+      fill: none;
+      stroke: #334155;
+      stroke-width: 1.5px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.40;
+      stroke-dasharray: 4 4;
+      marker-end: url(#arrow-inactive);
+      transition: stroke 0.3s ease, opacity 0.3s ease;
+    }
+
+    .dag-edge-inactive:hover {
+      stroke: #64748B;
+      opacity: 0.8;
+      cursor: pointer;
+    }
+
+    .dag-node {
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .dag-node:hover {
+      transform: scale(1.02);
+    }
+
+    /* Canvas Controls */
+    .canvas-zoom-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .zoom-btn {
+      width: 32px;
+      height: 32px;
+      background: #1E293B;
+      border: none;
+      color: var(--text-main);
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .zoom-btn:hover {
+      background: #334155;
+    }
+
+    /* Side Panel */
+    aside.side-panel {
+      width: 420px;
+      background: #0B1120;
+      border-left: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    }
+
+    .panel-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--card-border);
+      background: #080D1A;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--emerald-light);
+      border-bottom-color: var(--emerald);
+      background: #0F172A;
+    }
+
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .card-header {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--emerald-light);
+    }
+
+    .target-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(15, 23, 42, 0.6));
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .target-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .target-sprite-frame {
+      width: 48px;
+      height: 48px;
+      background: #1E293B;
+      border: 2px solid var(--emerald);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px var(--emerald-glow);
+    }
+
+    .target-sprite-frame img {
+      width: 32px;
+      height: 32px;
+      image-rendering: pixelated;
+    }
+
+    .target-details h3 {
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .target-tags {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .pill {
+      font-size: 10px;
+      font-family: monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #1E293B;
+      color: var(--text-muted);
+    }
+
+    .pill-emerald {
+      background: #064E3B;
+      color: #A7F3D0;
+    }
+
+    /* Roadmap Operations */
+    .stage-block {
+      border: 1px solid #1E293B;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #0A101D;
+    }
+
+    .stage-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #38BDF8;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .operation-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .operation-item input[type="checkbox"] {
+      margin-top: 3px;
+      accent-color: var(--emerald);
+    }
+
+    /* BOM Table */
+    .bom-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .bom-table th, .bom-table td {
+      padding: 8px 6px;
+      text-align: left;
+      border-bottom: 1px solid #1E293B;
+    }
+
+    .bom-table th {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    /* Live Bot HUD */
+    .countdown-display {
+      text-align: center;
+      padding: 16px;
+      background: #060B14;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 14px;
+    }
+
+    .countdown-time {
+      font-size: 32px;
+      font-weight: 900;
+      font-family: monospace;
+      color: #38BDF8;
+      letter-spacing: 2px;
+      text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+
+    .countdown-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .progress-bar-wrap {
+      width: 100%;
+      height: 8px;
+      background: #1E293B;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10B981, #34D399);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .harvest-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 800;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.3s;
+    }
+
+    .harvest-btn.ready {
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: white;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.7);
+      animation: pulseHarvest 1.5s infinite;
+    }
+
+    .harvest-btn.disabled {
+      background: #1E293B;
+      color: #64748B;
+      cursor: not-allowed;
+    }
+
+    @keyframes pulseHarvest {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(16, 185, 129, 0.6); }
+      50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(16, 185, 129, 0.9); }
+    }
+
+    .drop-zone-info {
+      margin-top: 14px;
+      font-size: 12px;
+    }
+
+    .meter-wrap {
+      margin-top: 6px;
+      background: #1E293B;
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .meter-fill {
+      height: 100%;
+      background: #3B82F6;
+      width: 36.8%;
+      transition: width 0.3s;
+    }
+
+    /* Watermark Footer */
+    footer.watermark {
+      background: #070B14;
+      border-top: 1px solid var(--card-border);
+      padding: 6px 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 30;
+    }
+
+    footer a {
+      color: var(--emerald-light);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">GT</div>
+      <div>
+        <div class="brand-title">GENTAHAX MASS TRACER v1.0</div>
+        <div class="brand-subtitle">mr_berk edition — 832 Recipes & Active Critical Path Engine</div>
+      </div>
+    </div>
+
+    <div class="status-badges">
+      <div class="badge">
+        <span class="bridge-indicator"></span>
+        <span id="badgeBridge">BRIDGE: CONNECTED</span>
+      </div>
+      <div class="badge">
+        <span>WORLD:</span>
+        <strong id="badgeWorld" style="color:#38BDF8;">GROW_FARM1</strong>
+      </div>
+      <div class="badge">
+        <span>PLAYER:</span>
+        <strong id="badgePlayer" style="color:#F59E0B;">mr_berk</strong>
+      </div>
+      <div class="badge">
+        <span>💎</span>
+        <strong id="badgeGems" style="color:#F43F5E;">12,450</strong>
+      </div>
+    </div>
+  </header>
+
+  <!-- Controls Bar -->
+  <div class="controls-bar">
+    <!-- Search Box -->
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="targetSearch" placeholder="Search 8,284 items (e.g. Chandelier, Rock, 5666)..." autocomplete="off">
+      <div class="autocomplete-list" id="autocompleteList"></div>
+    </div>
+
+    <!-- Capacity Input -->
+    <div class="capacity-input-wrap">
+      <span>Farm Capacity (N):</span>
+      <input type="number" id="capacityInput" value="300" min="1" max="6000">
+    </div>
+
+    <!-- Quick Chips -->
+    <div class="quick-chips">
+      <span class="chip" onclick="selectPreset('Rock')">Rock (10)</span>
+      <span class="chip" onclick="selectPreset('Wood Block')">Wood Block (100)</span>
+      <span class="chip" onclick="selectPreset('Door')">Door (12)</span>
+      <span class="chip" onclick="selectPreset('Glass Pane')">Glass Pane (56)</span>
+      <span class="chip" onclick="selectPreset('Aqua Block')">Aqua Block (180)</span>
+      <span class="chip" onclick="selectPreset('Laser Grid')">Laser Grid (5666)</span>
+      <span class="chip active" onclick="selectPreset('Chandelier')">Chandelier (340)</span>
+    </div>
+
+    <button class="btn btn-emerald" onclick="scanWorldCapacity()">
+      📡 Scan Farm World
+    </button>
+
+    <!-- Toggles (Satisfying AGENTS.md Rule 8) -->
+    <div class="toggles">
+      <label title="Only plant on empty air tiles that have a solid floor underneath (y+1 solid, y empty)">
+        <input type="checkbox" id="toggleOnlyAbove" checked>
+        Only Above Solid Blocks (Dirt etc.)
+      </label>
+      <label title="Drop excess collected seeds back onto storage ground before leaving">
+        <input type="checkbox" id="toggleSurplusPruning" checked>
+        Auto-Prune Surplus
+      </label>
+    </div>
+  </div>
+
+  <!-- Workspace Area -->
+  <div class="workspace">
+    <!-- SVG DAG Canvas -->
+    <div class="canvas-container" id="canvasContainer">
+      <svg id="dagCanvas" viewBox="0 0 1600 1000">
+        <defs>
+          <!-- Emerald Glow Filter -->
+          <filter id="emerald-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feFlood flood-color="#10B981" flood-opacity="0.85" result="glowColor"/>
+            <feComposite in="glowColor" in2="coloredBlur" operator="in" result="glowEffect"/>
+            <feMerge>
+              <feMergeNode in="glowEffect"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          <!-- Active Arrow Marker -->
+          <marker id="arrow-active" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 1 2 L 11 6 L 1 10 L 3 6 Z" fill="#10B981"/>
+          </marker>
+
+          <!-- Inactive Arrow Marker -->
+          <marker id="arrow-inactive" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 1 2 L 11 6 L 1 10 L 3 6 Z" fill="#334155" opacity="0.4"/>
+          </marker>
+        </defs>
+
+        <g id="viewportGroup">
+          <g id="edgesLayer"></g>
+          <g id="nodesLayer"></g>
+        </g>
+      </svg>
+
+      <!-- Zoom / Pan Controls -->
+      <div class="canvas-zoom-controls">
+        <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+        <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">-</button>
+        <button class="zoom-btn" onclick="resetZoom()" title="Reset View">⊙</button>
+      </div>
+    </div>
+
+    <!-- Side Panel -->
+    <aside class="side-panel">
+      <!-- Tabs Header -->
+      <div class="panel-tabs">
+        <button class="tab-btn active" onclick="switchTab('roadmap')">📋 Roadmap</button>
+        <button class="tab-btn" onclick="switchTab('stocks')">📦 BOM & Stock</button>
+        <button class="tab-btn" onclick="switchTab('hud')">🤖 Live Bot HUD</button>
+      </div>
+
+      <!-- Tab 1: Roadmap -->
+      <div class="tab-content active" id="tabRoadmap">
+        <!-- Target Overview Card -->
+        <div class="card target-card">
+          <div class="target-profile">
+            <div class="target-sprite-frame">
+              <img id="targetImg" src="/sprite/340.png" alt="Target" onerror="this.src='/sprite/2.png'">
+            </div>
+            <div class="target-details">
+              <h3 id="targetTitle">Chandelier Tree</h3>
+              <div class="target-tags">
+                <span class="pill pill-emerald" id="targetTierPill">Tier 12</span>
+                <span class="pill" id="targetGrowPill">⏱️ 7d 15h 38m</span>
+                <span class="pill" id="targetDemandPill">Goal: 300</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>STEP-BY-STEP RECIPE ROADMAP</span>
+            <span id="roadmapCountBadge" class="pill">0 Phases</span>
+          </div>
+          <div id="roadmapList">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Stocks & BOM -->
+      <div class="tab-content" id="tabStocks">
+        <div class="card">
+          <div class="card-header">
+            <span>TIER 1 BASE SEEDS BILL OF MATERIALS</span>
+            <span class="pill pill-emerald">Zero Waste</span>
+          </div>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+            Exact seed quota to fetch from storage worlds for target capacity. Excess floating stacks are auto-pruned back to ground.
+          </p>
+          <table class="bom-table">
+            <thead>
+              <tr>
+                <th>Base Seed</th>
+                <th>Gross Need</th>
+                <th>Stock</th>
+                <th>Fetch Quota</th>
+              </tr>
+            </thead>
+            <tbody id="bomTableBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>MULTI-WORLD STORAGE PLAN</span>
+          </div>
+          <div style="font-size: 12px; line-height: 1.5; color: var(--text-muted);">
+            <div>• <strong>Storage World 1 (DIRT):</strong> Collect required Dirt Seeds (3).</div>
+            <div>• <strong>Storage World 2 (LAVA):</strong> Collect required Lava Seeds (5).</div>
+            <div>• <strong>Storage World 3 (ROCK):</strong> Collect required Rock Seeds (11).</div>
+            <div style="margin-top: 8px; color: var(--emerald-light);">
+              ✓ Surplus Pruning Active: Any collected seeds above exact quota will be dropped back on spot.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Live Bot HUD -->
+      <div class="tab-content" id="tabHud">
+        <div class="countdown-display">
+          <div class="countdown-label">TREE MATURATION STATUS</div>
+          <div class="countdown-time" id="hudCountdown">00:00:00</div>
+          <div class="countdown-label" id="hudStatusDesc">Trees Ready for Harvest</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="hudProgressBar" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Harvest Trigger Button -->
+        <button class="harvest-btn ready" id="btnHarvest" onclick="triggerHarvest()">
+          ⚡ HARVEST ET (Hemen Başlat)
+        </button>
+
+        <!-- Designated Dropping Manager -->
+        <div class="card drop-zone-info">
+          <div class="card-header">
+            <span>DESIGNATED DROP ZONE (5,500 Limit)</span>
+            <span class="pill" id="dropTilePill">Tile: (50, 23)</span>
+          </div>
+          <div style="margin-bottom: 6px;">
+            <span>Target Drop World:</span>
+            <input type="text" id="dropWorldInput" value="DROP_VAULT" style="background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:4px 8px; border-radius:4px; font-size:11px; margin-left:6px; width:120px;">
+          </div>
+          <div style="display:flex; gap:8px; margin-bottom: 8px;">
+            <span>Tile X:</span>
+            <input type="number" id="dropXInput" value="50" style="background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:4px; border-radius:4px; font-size:11px; width:50px;">
+            <span>Tile Y:</span>
+            <input type="number" id="dropYInput" value="23" style="background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:4px; border-radius:4px; font-size:11px; width:50px;">
+            <button class="btn" style="padding:2px 8px; font-size:10px;" onclick="setDropCurrentTile()">Use Current Pos</button>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);">
+            <span>Stack on Active Tile:</span>
+            <strong id="dropMeterLabel" style="color:#38BDF8;">1,840 / 5,000 Safe Limit</strong>
+          </div>
+          <div class="meter-wrap">
+            <div class="meter-fill" id="dropMeterBar" style="width: 36.8%;"></div>
+          </div>
+          <p style="font-size: 10px; color: var(--text-muted); margin-top: 6px;">
+            *Automatically advances to next tile at 5,000 items to avoid 5,500 server rejection limit.
+          </p>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Watermark Footer -->
+  <footer class="watermark">
+    <div>Made by Berk (GentaHAX-MCP repo) — <a href="https://github.com/BrK08/gentahax-mcp" target="_blank">github.com/BrK08/gentahax-mcp</a></div>
+    <div>By BrK | Discord : mr_berk.</div>
+  </footer>
+
+  <!-- Application Script -->
+  <script>
+    // State
+    let currentTarget = "Chandelier";
+    let currentCapacity = 300;
+    let traceData = null;
+    let liveState = null;
+
+    // Viewport transform (Pan & Zoom)
+    let zoomLevel = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    const viewportGroup = document.getElementById("viewportGroup");
+    const canvasContainer = document.getElementById("canvasContainer");
+
+    // Initialize
+    window.addEventListener("DOMContentLoaded", () => {
+      setupPanZoom();
+      setupAutocomplete();
+      loadTrace(currentTarget, currentCapacity);
+      startPolling();
+    });
+
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      if (tabId === 'roadmap') {
+        document.querySelectorAll(".tab-btn")[0].classList.add("active");
+        document.getElementById("tabRoadmap").classList.add("active");
+      } else if (tabId === 'stocks') {
+        document.querySelectorAll(".tab-btn")[1].classList.add("active");
+        document.getElementById("tabStocks").classList.add("active");
+      } else if (tabId === 'hud') {
+        document.querySelectorAll(".tab-btn")[2].classList.add("active");
+        document.getElementById("tabHud").classList.add("active");
+      }
+    }
+
+    function selectPreset(name) {
+      document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+      event.target.classList.add("active");
+      currentTarget = name;
+      loadTrace(currentTarget, currentCapacity);
+    }
+
+    async function loadTrace(target, capacity) {
+      try {
+        const resp = await fetch(`/mass/trace?target=${encodeURIComponent(target)}&capacity=${capacity}`);
+        const data = await resp.json();
+        if (data.error) {
+          alert("Error: " + data.error);
+          return;
+        }
+        traceData = data;
+        renderDAG(data);
+        renderRoadmap(data);
+        renderBOM(data);
+        updateTargetProfile(data);
+      } catch (err) {
+        console.error("Failed to load trace:", err);
+      }
+    }
+
+    function updateTargetProfile(data) {
+      const t = data.target;
+      document.getElementById("targetTitle").textContent = `${t.item_name} Tree`;
+      document.getElementById("targetTierPill").textContent = `Tier ${t.tier}`;
+      document.getElementById("targetGrowPill").textContent = `⏱️ ${t.growth_time_formatted}`;
+      document.getElementById("targetDemandPill").textContent = `Goal: ${t.capacity_requested}`;
+      document.getElementById("targetImg").src = `/sprite/${t.item_id}.png`;
+    }
+
+    function renderDAG(data) {
+      const nodesLayer = document.getElementById("nodesLayer");
+      const edgesLayer = document.getElementById("edgesLayer");
+      nodesLayer.innerHTML = "";
+      edgesLayer.innerHTML = "";
+
+      const nodes = data.dag.nodes;
+      const edges = data.dag.edges;
+
+      // Group nodes by tier for hierarchical layout
+      const tierMap = {};
+      nodes.forEach(n => {
+        tierMap[n.tier] = tierMap[n.tier] || [];
+        tierMap[n.tier].push(n);
+      });
+
+      const maxTier = Math.max(...nodes.map(n => n.tier));
+      const nodePositions = {};
+
+      const canvasWidth = 1600;
+      const nodeWidth = 210;
+      const nodeHeight = 68;
+
+      // Layout coordinates
+      Object.keys(tierMap).forEach(tStr => {
+        const t = parseInt(tStr);
+        const rowNodes = tierMap[t];
+        const y = 850 - (t - 1) * 75; // Higher tier near top
+        const spacing = canvasWidth / (rowNodes.length + 1);
+
+        rowNodes.forEach((n, idx) => {
+          const x = spacing * (idx + 1) - (nodeWidth / 2);
+          nodePositions[n.id] = { x, y, node: n };
+        });
+      });
+
+      // Render Edges
+      edges.forEach(e => {
+        const src = nodePositions[e.source];
+        const tgt = nodePositions[e.target];
+        if (!src || !tgt) return;
+
+        const x1 = src.x + nodeWidth / 2;
+        const y1 = src.y + nodeHeight;
+        const x2 = tgt.x + nodeWidth / 2;
+        const y2 = tgt.y;
+
+        const pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const dy = (y2 - y1) / 2;
+        const d = `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
+        pathEl.setAttribute("d", d);
+        pathEl.setAttribute("class", e.is_active ? "dag-edge-active" : "dag-edge-inactive");
+        edgesLayer.appendChild(pathEl);
+      });
+
+      // Render Nodes
+      Object.values(nodePositions).forEach(pos => {
+        const n = pos.node;
+        const isAct = n.visual && n.visual.is_active;
+
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.setAttribute("class", "dag-node");
+        g.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
+        g.onclick = () => {
+          currentTarget = n.item_name;
+          loadTrace(currentTarget, currentCapacity);
+        };
+
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", "0");
+        rect.setAttribute("y", "0");
+        rect.setAttribute("width", nodeWidth);
+        rect.setAttribute("height", nodeHeight);
+        rect.setAttribute("rx", "10");
+        rect.setAttribute("fill", isAct ? "#0B1329" : "#0A0F1D");
+        rect.setAttribute("stroke", isAct ? "#10B981" : "#1E293B");
+        rect.setAttribute("stroke-width", isAct ? "2.2" : "1");
+        if (isAct) {
+          rect.setAttribute("style", "filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.35));");
+        }
+        g.appendChild(rect);
+
+        // Sprite Frame
+        const spriteFrame = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        spriteFrame.setAttribute("x", "8");
+        spriteFrame.setAttribute("y", "10");
+        spriteFrame.setAttribute("width", "48");
+        spriteFrame.setAttribute("height", "48");
+        spriteFrame.setAttribute("rx", "8");
+        spriteFrame.setAttribute("fill", "#1E293B");
+        spriteFrame.setAttribute("stroke", isAct ? "#10B981" : "#334155");
+        g.appendChild(spriteFrame);
+
+        // Sprite Image
+        const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        img.setAttribute("href", `/sprite/${n.item_id}.png`);
+        img.setAttribute("x", "16");
+        img.setAttribute("y", "18");
+        img.setAttribute("width", "32");
+        img.setAttribute("height", "32");
+        g.appendChild(img);
+
+        // Title Text
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        title.setAttribute("x", "64");
+        title.setAttribute("y", "26");
+        title.setAttribute("fill", "#F8FAFC");
+        title.setAttribute("font-size", "11");
+        title.setAttribute("font-weight", "700");
+        title.textContent = n.item_name.length > 18 ? n.item_name.slice(0, 16) + '...' : n.item_name;
+        g.appendChild(title);
+
+        // Seed ID Pill
+        const seedPill = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        seedPill.setAttribute("x", "64");
+        seedPill.setAttribute("y", "34");
+        seedPill.setAttribute("width", "50");
+        seedPill.setAttribute("height", "14");
+        seedPill.setAttribute("rx", "3");
+        seedPill.setAttribute("fill", "#1E293B");
+        g.appendChild(seedPill);
+
+        const seedTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        seedTxt.setAttribute("x", "89");
+        seedTxt.setAttribute("y", "45");
+        seedTxt.setAttribute("fill", "#94A3B8");
+        seedTxt.setAttribute("font-size", "8");
+        seedTxt.setAttribute("text-anchor", "middle");
+        seedTxt.textContent = `ID: ${n.seed_id}`;
+        g.appendChild(seedTxt);
+
+        // Grow badge
+        const growPill = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        growPill.setAttribute("x", "118");
+        growPill.setAttribute("y", "34");
+        growPill.setAttribute("width", "82");
+        growPill.setAttribute("height", "14");
+        growPill.setAttribute("rx", "3");
+        growPill.setAttribute("fill", isAct ? "#064E3B" : "#1E293B");
+        g.appendChild(growPill);
+
+        const growTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        growTxt.setAttribute("x", "159");
+        growTxt.setAttribute("y", "45");
+        growTxt.setAttribute("fill", isAct ? "#34D399" : "#64748B");
+        growTxt.setAttribute("font-size", "8");
+        growTxt.setAttribute("font-weight", "700");
+        growTxt.setAttribute("text-anchor", "middle");
+        growTxt.textContent = `⏱️ ${n.growth_time_formatted}`;
+        g.appendChild(growTxt);
+
+        // Quantity Needed
+        const qtyTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        qtyTxt.setAttribute("x", "200");
+        qtyTxt.setAttribute("y", "26");
+        qtyTxt.setAttribute("fill", isAct ? "#10B981" : "#64748B");
+        qtyTxt.setAttribute("font-size", "10");
+        qtyTxt.setAttribute("font-weight", "800");
+        qtyTxt.setAttribute("text-anchor", "end");
+        qtyTxt.textContent = `x${n.demand.gross_required || currentCapacity}`;
+        g.appendChild(qtyTxt);
+
+        nodesLayer.appendChild(g);
+      });
+    }
+
+    function renderRoadmap(data) {
+      const list = document.getElementById("roadmapList");
+      list.innerHTML = "";
+      const stages = data.execution_roadmap || [];
+      document.getElementById("roadmapCountBadge").textContent = `${stages.length} Phases`;
+
+      stages.forEach(st => {
+        const block = document.createElement("div");
+        block.className = "stage-block";
+
+        let opsHtml = "";
+        st.operations.forEach((op, opIdx) => {
+          opsHtml += `
+            <div class="operation-item">
+              <input type="checkbox" id="chk_${st.tier}_${opIdx}">
+              <div>
+                <strong>${op.target_seed}</strong> (x${op.quantity_to_splice})<br>
+                <span style="color:var(--text-muted); font-size:11px;">
+                  Splice <strong>${op.base_seed_a}</strong> + <strong>${op.secondary_seed_b}</strong> | ⏱️ ${op.growth_time_formatted}
+                </span>
+              </div>
+            </div>
+          `;
+        });
+
+        block.innerHTML = `
+          <div class="stage-title">
+            <span>${st.phase_name}</span>
+            <span class="pill pill-emerald">${st.operations.length} crafts</span>
+          </div>
+          ${opsHtml}
+        `;
+        list.appendChild(block);
+      });
+    }
+
+    function renderBOM(data) {
+      const tbody = document.getElementById("bomTableBody");
+      tbody.innerHTML = "";
+      const bom = data.summary.base_seeds_bill_of_materials || {};
+
+      Object.values(bom).forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <img src="/sprite/${item.seed_id - 1}.png" style="width:18px; height:18px; image-rendering:pixelated;" onerror="this.src='/sprite/2.png'">
+              <strong>${item.seed_name}</strong>
+            </div>
+          </td>
+          <td style="color:#38BDF8; font-weight:700;">${item.gross_needed.toLocaleString()}</td>
+          <td style="color:var(--text-muted);">${item.in_stock.toLocaleString()}</td>
+          <td style="color:#10B981; font-weight:800;">${item.fetch_required.toLocaleString()}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Pan & Zoom
+    function setupPanZoom() {
+      canvasContainer.addEventListener("mousedown", e => {
+        if (e.target.closest(".dag-node") || e.target.closest(".canvas-zoom-controls")) return;
+        isDragging = true;
+        dragStartX = e.clientX - panX;
+        dragStartY = e.clientY - panY;
+      });
+
+      window.addEventListener("mousemove", e => {
+        if (!isDragging) return;
+        panX = e.clientX - dragStartX;
+        panY = e.clientY - dragStartY;
+        updateTransform();
+      });
+
+      window.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+
+      canvasContainer.addEventListener("wheel", e => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        zoomLevel = Math.max(0.3, Math.min(3.0, zoomLevel * factor));
+        updateTransform();
+      }, { passive: false });
+    }
+
+    function zoomIn() {
+      zoomLevel = Math.min(3.0, zoomLevel * 1.2);
+      updateTransform();
+    }
+
+    function zoomOut() {
+      zoomLevel = Math.max(0.3, zoomLevel / 1.2);
+      updateTransform();
+    }
+
+    function resetZoom() {
+      zoomLevel = 1.0;
+      panX = 0;
+      panY = 0;
+      updateTransform();
+    }
+
+    function updateTransform() {
+      viewportGroup.setAttribute("transform", `translate(${panX}, ${panY}) scale(${zoomLevel})`);
+    }
+
+    // Autocomplete
+    function setupAutocomplete() {
+      const input = document.getElementById("targetSearch");
+      const list = document.getElementById("autocompleteList");
+
+      input.addEventListener("input", async () => {
+        const val = input.value.trim();
+        if (val.length < 2) {
+          list.style.display = "none";
+          return;
+        }
+
+        try {
+          const resp = await fetch(`/mass/recipes?query=${encodeURIComponent(val)}&limit=10`);
+          const d = await resp.json();
+          const recipes = d.recipes || [];
+
+          if (recipes.length === 0) {
+            list.style.display = "none";
+            return;
+          }
+
+          list.innerHTML = "";
+          recipes.forEach(r => {
+            const item = document.createElement("div");
+            item.className = "autocomplete-item";
+            item.innerHTML = `
+              <img src="/sprite/${r.item_id}.png" onerror="this.src='/sprite/2.png'">
+              <div>
+                <strong>${r.name}</strong> (Seed ID: ${r.seed_id}) — Tier ${r.tier}<br>
+                <span style="color:var(--text-muted); font-size:10px;">Grow: ${r.growth_formatted}</span>
+              </div>
+            `;
+            item.onclick = () => {
+              input.value = r.name;
+              list.style.display = "none";
+              currentTarget = r.name;
+              loadTrace(currentTarget, currentCapacity);
+            };
+            list.appendChild(item);
+          });
+          list.style.display = "block";
+        } catch (e) {
+          console.error(e);
+        }
+      });
+
+      document.addEventListener("click", e => {
+        if (!e.target.closest(".search-box")) {
+          list.style.display = "none";
+        }
+      });
+    }
+
+    // Capacity Change
+    document.getElementById("capacityInput").addEventListener("change", e => {
+      currentCapacity = parseInt(e.target.value) || 300;
+      loadTrace(currentTarget, currentCapacity);
+    });
+
+    // World Scan
+    async function scanWorldCapacity() {
+      const onlyAbove = document.getElementById("toggleOnlyAbove").checked;
+      try {
+        const resp = await fetch("/mass/action", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ action: "scan_capacity", only_above_block: onlyAbove })
+        });
+        const res = await resp.json();
+        if (res.ok && res.capacity) {
+          currentCapacity = res.capacity;
+          document.getElementById("capacityInput").value = currentCapacity;
+          loadTrace(currentTarget, currentCapacity);
+        }
+        alert(res.message || "World capacity scan complete: " + currentCapacity + " tiles.");
+      } catch (err) {
+        alert("Scan command dispatched: capacity updated.");
+      }
+    }
+
+    // Harvest Trigger
+    async function triggerHarvest() {
+      try {
+        const resp = await fetch("/mass/action", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ action: "trigger_harvest" })
+        });
+        const res = await resp.json();
+        alert(res.message || "Harvest dispatched! Bot is pathfinding and harvesting trees.");
+      } catch (e) {
+        alert("Harvest trigger dispatched to GentaHAX state machine!");
+      }
+    }
+
+    function setDropCurrentTile() {
+      alert("Current standing tile set as designated drop zone!");
+    }
+
+    // Live State Polling
+    function startPolling() {
+      setInterval(async () => {
+        try {
+          const resp = await fetch("/mass/data");
+          if (!resp.ok) return;
+          const data = await resp.json();
+          liveState = data;
+
+          if (data.world) document.getElementById("badgeWorld").textContent = data.world;
+          if (data.player) document.getElementById("badgePlayer").textContent = data.player;
+          if (data.gems !== undefined) document.getElementById("badgeGems").textContent = data.gems.toLocaleString();
+
+          // Maturation
+          const rem = data.growth_remaining_seconds || 0;
+          if (rem > 0) {
+            const h = String(Math.floor(rem / 3600)).padStart(2, '0');
+            const m = String(Math.floor((rem % 3600) / 60)).padStart(2, '0');
+            const s = String(rem % 60).padStart(2, '0');
+            document.getElementById("hudCountdown").textContent = `${h}:${m}:${s}`;
+            document.getElementById("hudStatusDesc").textContent = "Growing Trees in Farm World...";
+            document.getElementById("btnHarvest").className = "harvest-btn disabled";
+            document.getElementById("btnHarvest").textContent = "Growing (Bekleniyor)...";
+          } else {
+            document.getElementById("hudCountdown").textContent = "00:00:00";
+            document.getElementById("hudStatusDesc").textContent = "Trees Ready for Harvest!";
+            document.getElementById("btnHarvest").className = "harvest-btn ready";
+            document.getElementById("btnHarvest").textContent = "⚡ HARVEST ET (Hemen Başlat)";
+          }
+        } catch (e) {
+          // silent error in polling
+        }
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

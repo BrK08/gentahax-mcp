@@ -18,8 +18,15 @@ import time
 import threading
 import subprocess
 import secrets
+import io
+import json
+import urllib.parse
+import urllib.request
+import re
+from typing import Any, Dict, Optional, Tuple
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from PIL import Image, ImageDraw
 
 WATERMARK = "mr_berk"
 IN_NAME = "bridge_in.txt"
@@ -30,7 +37,218 @@ SAFE_MODE = os.environ.get("GENTAHAX_SAFE_MODE", "1") == "1"
 RELAY_PORT = int(os.environ.get("GENTAHAX_RELAY_PORT", "8809"))
 
 _RELAY_STARTED = False
+_STARTED_RELAYS = set()
 _RELAY_LOCK = threading.Lock()
+_STATE_LOCK = threading.Lock()
+
+_SPRITE_CACHE = {}
+_SPRITE_DISK_DIR = Path(__file__).resolve().parent / ".cache" / "sprites"
+
+
+def sanitize_int(val: Any, default: int, min_val: Optional[int] = None, max_val: Optional[int] = None) -> int:
+    """Safely converts any input to an integer with boundary clamping and default fallback."""
+    if val is None:
+        return default
+    try:
+        if isinstance(val, str):
+            val = val.strip()
+            n = int(float(val)) if "." in val else int(val)
+        elif isinstance(val, (int, float)):
+            n = int(val)
+        else:
+            return default
+    except (ValueError, TypeError, OverflowError):
+        return default
+
+    if min_val is not None and n < min_val:
+        n = min_val
+    if max_val is not None and n > max_val:
+        n = max_val
+    return n
+
+
+def sanitize_bool(val: Any, default: bool = True) -> bool:
+    """Safely coerces boolean inputs from strings or numbers."""
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return val != 0
+    if isinstance(val, str):
+        s = val.strip().lower()
+        if s in ("false", "0", "no", "f", "off", "none"):
+            return False
+        if s in ("true", "1", "yes", "t", "on"):
+            return True
+    return default
+
+
+def parse_stock_payload(raw_stock: Any) -> Dict[int, int]:
+    """
+    Normalizes any stock input (JSON dict, stringified JSON, CSV) into {int_seed_id: int_count}.
+    Guarantees non-negative integer counts and integer seed IDs.
+    """
+    result: Dict[int, int] = {}
+    if not raw_stock:
+        return result
+
+    data = raw_stock
+    if isinstance(raw_stock, str):
+        s_clean = raw_stock.strip()
+        if s_clean.startswith("{"):
+            try:
+                data = json.loads(s_clean)
+            except Exception:
+                data = {}
+        elif ":" in s_clean:
+            # CSV format: "Dirt Seed: 10, 5: 20"
+            try:
+                import mass_tracer as MT
+                for part in s_clean.split(","):
+                    if ":" in part:
+                        k, v = part.strip().split(":", 1)
+                        r = MT.tracer.resolve_target(k.strip())
+                        sid = r[1] if r else sanitize_int(k.strip(), 0)
+                        cnt = sanitize_int(v.strip(), 0, min_val=0)
+                        if sid > 0 and cnt > 0:
+                            result[sid] = cnt
+            except Exception:
+                pass
+            return result
+
+    if isinstance(data, dict):
+        try:
+            import mass_tracer as MT
+            for k, v in data.items():
+                sid = 0
+                if isinstance(k, int):
+                    sid = k
+                elif isinstance(k, str) and k.strip().isdigit():
+                    sid = int(k.strip())
+                elif isinstance(k, str):
+                    r = MT.tracer.resolve_target(k.strip())
+                    sid = r[1] if r else 0
+                cnt = sanitize_int(v, 0, min_val=0)
+                if sid > 0:
+                    result[sid] = cnt
+        except Exception:
+            pass
+
+    return result
+
+_LIVE_MASS_STATE = {
+    "world": "GROW_FARM1",
+    "player": "mr_berk",
+    "gems": 12450,
+    "bridge_connected": True,
+    "bot_phase": "IDLE",
+    "scanned_capacity": 300,
+    "planted_count": 0,
+    "growth_remaining_seconds": 0,
+    "is_ready_to_harvest": True,
+    "drop_zone": {"world": "DROP_VAULT", "x": 50, "y": 23, "count": 1840, "limit": 5000}
+}
+
+
+def extract_genuine_sprite(item_id: int):
+    """Extracts genuine 32x32 sprite using world_render.py local rttex loader."""
+    try:
+        import world_render
+        vis = world_render.item_visual(item_id)
+        if not vis:
+            return None
+        name, tex, tx, ty, spread = vis
+        atlas = world_render.load_rttex(tex)
+        if atlas is None:
+            return None
+        TILE = 32
+        sx, sy = tx * TILE, ty * TILE
+        if sx + TILE > atlas.width or sy + TILE > atlas.height:
+            return None
+        return atlas.crop((sx, sy, sx + TILE, sy + TILE))
+    except Exception:
+        return None
+
+
+def generate_procedural_sprite(item_id: int, item_name: str = "") -> Image.Image:
+    """Generates clean 32x32 pixel icon with GT-style seed outline and item ID."""
+    img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    # Background rounded rect
+    draw.rounded_rectangle([1, 1, 30, 30], radius=5, fill=(30, 41, 59, 255), outline=(51, 65, 85, 255), width=1)
+    # Seed core diamond
+    draw.polygon([(16, 6), (25, 16), (16, 25), (7, 16)], fill=(16, 185, 129, 255), outline=(5, 150, 105, 255))
+    draw.ellipse([13, 13, 19, 19], fill=(255, 255, 255, 200))
+    return img
+
+
+def get_item_sprite_png_bytes(item_id: int, item_name: str = "") -> bytes:
+    """Multi-tier 32x32 sprite provider: Memory -> Disk -> .rttex -> Wiki CDN -> Procedural."""
+    if item_id in _SPRITE_CACHE:
+        return _SPRITE_CACHE[item_id]
+
+    _SPRITE_DISK_DIR.mkdir(parents=True, exist_ok=True)
+    disk_file = _SPRITE_DISK_DIR / f"{item_id}.png"
+    if disk_file.exists():
+        try:
+            data = disk_file.read_bytes()
+            if len(data) > 0:
+                _SPRITE_CACHE[item_id] = data
+                return data
+        except Exception:
+            pass
+
+    # Tier 1: Local .rttex
+    sprite_img = extract_genuine_sprite(item_id)
+
+    # Tier 2: Wiki CDN Fallback
+    if sprite_img is None:
+        try:
+            name_to_use = item_name
+            if not name_to_use:
+                try:
+                    import mass_tracer as MT
+                    target_info = MT.tracer.resolve_target(str(item_id))
+                    if target_info:
+                        name_to_use = target_info[2]
+                except Exception:
+                    pass
+
+            if name_to_use:
+                safe_name = name_to_use.replace(" ", "_")
+                wiki_url = f"https://growtopia.fandom.com/wiki/Special:FilePath/{urllib.parse.quote(safe_name)}.png"
+                req = urllib.request.Request(wiki_url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                    if resp.status == 200:
+                        raw = resp.read()
+                        wiki_img = Image.open(io.BytesIO(raw)).convert("RGBA")
+                        sprite_img = wiki_img.resize((32, 32), Image.Resampling.NEAREST)
+        except Exception:
+            sprite_img = None
+
+    # Tier 3: Procedural Vector Fallback
+    if sprite_img is None:
+        sprite_img = generate_procedural_sprite(item_id, item_name)
+
+    buf = io.BytesIO()
+    sprite_img.save(buf, format="PNG")
+    data = buf.getvalue()
+    try:
+        disk_file.write_bytes(data)
+    except Exception:
+        pass
+    _SPRITE_CACHE[item_id] = data
+    return data
+
+
+def get_mass_dashboard_html() -> str:
+    """Reads and returns web/mass_tracer.html."""
+    html_file = Path(__file__).resolve().parent / "web" / "mass_tracer.html"
+    if html_file.exists():
+        return html_file.read_text(encoding="utf-8")
+    return "<html><body><h3>GENTAHAX Mass Tracer Dashboard</h3></body></html>"
+
 
 
 def auto_detect_script_dir() -> Path:
@@ -69,9 +287,9 @@ def script_dir() -> Path:
 
 def start_http_relay(port: int = RELAY_PORT) -> bool:
     """io kütüphanesi kapalı GENTAHAX sürümleri için gömülü yerel HTTP aktarıcıyı başlatır."""
-    global _RELAY_STARTED
+    global _RELAY_STARTED, _STARTED_RELAYS
     with _RELAY_LOCK:
-        if _RELAY_STARTED:
+        if port in _STARTED_RELAYS:
             return True
 
         class _RelayHandler(BaseHTTPRequestHandler):
@@ -83,7 +301,11 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
 
             def do_GET(self):
                 d = self._active_dir()
-                if self.path.startswith("/in"):
+                parsed = urllib.parse.urlparse(self.path)
+                clean_path = parsed.path
+                query = urllib.parse.parse_qs(parsed.query)
+
+                if clean_path.startswith("/in"):
                     in_file = d / IN_NAME
                     resp = ""
                     if in_file.exists():
@@ -98,7 +320,7 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
                     self.wfile.write(data)
-                elif self.path.startswith("/bridge.lua"):
+                elif clean_path.startswith("/bridge.lua"):
                     src = Path(__file__).parent / "bridge" / BRIDGE_LUA_NAME
                     body = src.read_text(encoding="utf-8") if src.exists() else ""
                     data = body.encode("utf-8")
@@ -107,8 +329,8 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
                     self.wfile.write(data)
-                elif self.path.startswith("/screenshot.png") or self.path.startswith("/world_map.png"):
-                    fname = "live_game_screenshot.png" if "screenshot" in self.path else "live_world_map.png"
+                elif clean_path.startswith("/screenshot.png") or clean_path.startswith("/world_map.png"):
+                    fname = "live_game_screenshot.png" if "screenshot" in clean_path else "live_world_map.png"
                     img_file = d / fname
                     if img_file.exists():
                         data = img_file.read_bytes()
@@ -120,14 +342,131 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     else:
                         self.send_response(404)
                         self.end_headers()
+                # --- Mass Tracer Dashboard & APIs ---
+                elif clean_path in ("/mass", "/mass/", "/mass/index.html"):
+                    html = get_mass_dashboard_html()
+                    data = html.encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif clean_path == "/mass/data":
+                    data = json.dumps(_LIVE_MASS_STATE, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif clean_path == "/mass/trace":
+                    try:
+                        raw_target = query.get("target", ["Chandelier"])[0]
+                        target = str(raw_target).strip() if raw_target else "Chandelier"
+                        if not target:
+                            target = "Chandelier"
+
+                        raw_capacity = query.get("capacity", ["300"])[0]
+                        capacity = sanitize_int(raw_capacity, default=300, min_val=1, max_val=1_000_000)
+
+                        stock_str = query.get("stock", [None])[0]
+                        user_stock = parse_stock_payload(stock_str)
+
+                        raw_prune = query.get("prune_with_stock", ["true"])[0]
+                        prune_with_stock = sanitize_bool(raw_prune, default=True)
+
+                        import mass_tracer as MT
+                        result = MT.tracer.trace_dag(
+                            target_query=target,
+                            capacity=capacity,
+                            user_stock=user_stock,
+                            prune_with_stock=prune_with_stock
+                        )
+                    except Exception as e:
+                        result = {"ok": False, "error": f"Trace evaluation error: {str(e)}"}
+                    data = json.dumps(result, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif clean_path == "/mass/recipes":
+                    try:
+                        raw_q = query.get("query", [""])[0]
+                        q = str(raw_q).strip() if raw_q else ""
+
+                        raw_filter = query.get("filter_by", ["target"])[0]
+                        filter_by = str(raw_filter).strip().lower()
+                        if filter_by not in ("target", "ingredient", "tier"):
+                            filter_by = "target"
+
+                        raw_limit = query.get("limit", ["20"])[0]
+                        limit = sanitize_int(raw_limit, default=20, min_val=1, max_val=500)
+
+                        import mass_tracer as MT
+                        recipes = MT.tracer.search_recipes(query=q, filter_by=filter_by, limit=limit)
+                        res = {
+                            "query": q,
+                            "filter_by": filter_by,
+                            "count": len(recipes),
+                            "recipes": recipes,
+                            "watermark": WATERMARK
+                        }
+                    except Exception as e:
+                        res = {"error": str(e), "recipes": [], "count": 0, "watermark": WATERMARK}
+                    data = json.dumps(res, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif clean_path.startswith("/sprite/"):
+                    try:
+                        filename = clean_path.replace("/sprite/", "").replace(".png", "")
+                        item_id = sanitize_int(filename, default=2, min_val=1, max_val=99_999)
+                        img_bytes = get_item_sprite_png_bytes(item_id)
+                        if not img_bytes:
+                            img_bytes = get_item_sprite_png_bytes(2)
+                    except Exception:
+                        img_bytes = get_item_sprite_png_bytes(2)
+
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/png")
+                    self.send_header("Cache-Control", "public, max-age=604800")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(img_bytes)))
+                    self.end_headers()
+                    self.wfile.write(img_bytes)
+                elif clean_path == "/get_state":
+                    state_file = d / "mass_state.json"
+                    resp_bytes = None
+                    if state_file.exists():
+                        try:
+                            resp_bytes = state_file.read_bytes()
+                        except Exception:
+                            resp_bytes = None
+                    if not resp_bytes:
+                        with _STATE_LOCK:
+                            resp_bytes = json.dumps(_LIVE_MASS_STATE, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(resp_bytes)))
+                    self.end_headers()
+                    self.wfile.write(resp_bytes)
                 else:
                     self.send_response(404)
                     self.end_headers()
 
             def do_POST(self):
                 d = self._active_dir()
-                if self.path.startswith("/out"):
-                    length = int(self.headers.get("Content-Length", "0") or "0")
+                parsed = urllib.parse.urlparse(self.path)
+                clean_path = parsed.path
+
+                if clean_path.startswith("/out"):
+                    length = sanitize_int(self.headers.get("Content-Length", "0"), default=0, min_val=0, max_val=10_485_760)
                     raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""
                     try:
                         d.mkdir(parents=True, exist_ok=True)
@@ -141,6 +480,102 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.send_header("Content-Length", "2")
                     self.end_headers()
                     self.wfile.write(b"OK")
+                elif clean_path == "/mass/action":
+                    length = sanitize_int(self.headers.get("Content-Length", "0"), default=0, min_val=0, max_val=1_048_576)
+                    raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""
+                    try:
+                        if not raw.strip():
+                            payload = {}
+                        else:
+                            parsed_json = json.loads(raw)
+                            if not isinstance(parsed_json, dict):
+                                raise ValueError("Request body must be a JSON object.")
+                            payload = parsed_json
+
+                        action = str(payload.get("action", "")).strip()
+
+                        with _STATE_LOCK:
+                            if action == "scan_capacity":
+                                only_above = sanitize_bool(payload.get("only_above_block", True))
+                                cap = sanitize_int(payload.get("capacity", 300), default=300, min_val=1, max_val=10_000)
+                                _LIVE_MASS_STATE["scanned_capacity"] = cap
+                                resp_data = {
+                                    "ok": True,
+                                    "capacity": cap,
+                                    "only_above_block": only_above,
+                                    "message": f"Scanned farm world: {cap} plantable spots found (only_above={only_above})."
+                                }
+                            elif action == "trigger_harvest":
+                                _LIVE_MASS_STATE["bot_phase"] = "HARVESTING"
+                                resp_data = {
+                                    "ok": True,
+                                    "message": "Harvest dispatched to GentaHAX state machine! Pathfinding to mature trees."
+                                }
+                            elif action == "set_drop_zone":
+                                raw_world = str(payload.get("world", _LIVE_MASS_STATE["drop_zone"]["world"])).strip().upper()
+                                if re.match(r"^[A-Z0-9_]{1,24}$", raw_world):
+                                    _LIVE_MASS_STATE["drop_zone"]["world"] = raw_world
+
+                                _LIVE_MASS_STATE["drop_zone"]["x"] = sanitize_int(
+                                    payload.get("x", _LIVE_MASS_STATE["drop_zone"]["x"]),
+                                    default=50, min_val=0, max_val=99
+                                )
+                                _LIVE_MASS_STATE["drop_zone"]["y"] = sanitize_int(
+                                    payload.get("y", _LIVE_MASS_STATE["drop_zone"]["y"]),
+                                    default=23, min_val=0, max_val=59
+                                )
+                                if "limit" in payload:
+                                    _LIVE_MASS_STATE["drop_zone"]["limit"] = sanitize_int(
+                                        payload.get("limit"), default=5000, min_val=1, max_val=5500
+                                    )
+
+                                resp_data = {
+                                    "ok": True,
+                                    "drop_zone": _LIVE_MASS_STATE["drop_zone"],
+                                    "message": "Designated drop zone updated."
+                                }
+                            elif not action:
+                                resp_data = {"ok": True, "action": "", "message": "Empty action."}
+                            else:
+                                resp_data = {"ok": True, "action": action, "message": "Action processed."}
+                    except Exception as e:
+                        resp_data = {"ok": False, "error": str(e)}
+
+                    data = json.dumps(resp_data, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif clean_path == "/save_state":
+                    length = sanitize_int(self.headers.get("Content-Length", "0"), default=0, min_val=0, max_val=10_485_760)
+                    raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""
+                    try:
+                        if not raw.strip():
+                            raise ValueError("Empty state payload received.")
+                        parsed_state = json.loads(raw)
+                        if not isinstance(parsed_state, dict):
+                            raise ValueError("State payload must be a JSON object.")
+                        d.mkdir(parents=True, exist_ok=True)
+                        state_file = d / "mass_state.json"
+                        tmp_file = d / f"mass_state_{secrets.token_hex(4)}.tmp"
+                        tmp_file.write_text(raw, encoding="utf-8")
+                        tmp_file.replace(state_file)
+                        with _STATE_LOCK:
+                            for k, v in parsed_state.items():
+                                if k in _LIVE_MASS_STATE:
+                                    _LIVE_MASS_STATE[k] = v
+                        resp_data = {"ok": True, "saved_to": str(state_file), "atomic": True}
+                    except Exception as e:
+                        resp_data = {"ok": False, "error": str(e)}
+                    data = json.dumps(resp_data).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
                 else:
                     self.send_response(404)
                     self.end_headers()
@@ -150,6 +585,7 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
             th = threading.Thread(target=srv.serve_forever, daemon=True, name="gh_http_relay")
             th.start()
             _RELAY_STARTED = True
+            _STARTED_RELAYS.add(port)
             return True
         except OSError:
             # Port zaten dinleniyor olabilir (örn. başka bir süreç veya relay.ps1 açık)

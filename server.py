@@ -31,6 +31,8 @@ from fastmcp import FastMCP
 import knowledge as K
 import bridge as B
 import autotest as AT
+import mass_tracer as MT
+import logistics as LOG
 
 WATERMARK = "mr_berk"
 VERSION = "1.5.0"
@@ -1595,6 +1597,165 @@ def gh_script_gen(goal: str) -> str:
         "watermark": WATERMARK}, ensure_ascii=False, indent=2)
 
 
+# ===========================================================================
+# BÖLÜM 10 — MASS RECIPE TRACER & DAG TOOLS (mr_berk edition)
+# ===========================================================================
+
+@mcp.tool
+def gh_mass_trace(
+    target: str,
+    capacity: int = 1,
+    stock: Optional[str] = None,
+    prune_with_stock: bool = True
+) -> str:
+    """Calculates the complete DAG splicing path for a Growtopia target item/seed.
+
+    Identifies the active critical path vs inactive alternative branches with neon green
+    highlighting (#10B981) vs dark slate (#334155). Calculates exact seed requirements
+    for target farm capacity N down to Tier 1 base seeds (Dirt, Lava, Rock, Cave BG),
+    accounting for available stock and multi-parent intermediate seed aggregation.
+
+    Args:
+        target: Target item or seed name/ID (e.g. 'Chandelier', '340', 'Rock', 'Wood Block Seed').
+        capacity: Farm plantable capacity N (default 1).
+        stock: Optional JSON string or comma-separated list of available seeds in storage
+               (e.g. '{"3": 1500, "5": 800}' or 'Dirt Seed:1500, Lava Seed:800').
+        prune_with_stock: If True, intermediate branches fully satisfied by stock are pruned.
+
+    Returns:
+        JSON string with target info, base seeds bill of materials, staged splicing steps,
+        active critical path, and full DAG vertices/edges formatted for visualization.
+    """
+    user_stock = {}
+    if stock:
+        try:
+            s_clean = stock.strip()
+            if s_clean.startswith("{"):
+                user_stock = {int(k): int(v) for k, v in json.loads(s_clean).items()}
+            else:
+                for part in s_clean.split(","):
+                    if ":" in part:
+                        k, v = part.strip().split(":", 1)
+                        res = MT.tracer.resolve_target(k.strip())
+                        if res:
+                            user_stock[res[1]] = int(v.strip())
+        except Exception as e:
+            return json.dumps({"error": f"Invalid stock parameter: {str(e)}"}, ensure_ascii=False)
+
+    result = MT.tracer.trace_dag(
+        target_query=target,
+        capacity=max(1, capacity),
+        user_stock=user_stock,
+        prune_with_stock=prune_with_stock
+    )
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool
+def gh_mass_recipes(
+    query: str,
+    filter_by: str = "target",
+    limit: int = 20
+) -> str:
+    """Search and filter Growtopia splicing recipes from the authoritative 832-recipe database.
+
+    Args:
+        query: Item/seed name or ID to search for (e.g. 'Wood', '100', 'Lava Seed').
+        filter_by: Filter mode:
+                   - 'target': search recipes that produce this item.
+                   - 'ingredient': search recipes that use this seed as an ingredient.
+                   - 'tier': search recipes by tier number (e.g. '1', '2', '8').
+        limit: Maximum number of recipe matches to return (default 20).
+
+    Returns:
+        JSON string with matching recipes, ingredient pairs, grow times, and fruit drops.
+    """
+    results = MT.tracer.search_recipes(query=query, filter_by=filter_by, limit=limit)
+    return json.dumps({
+        "query": query,
+        "filter_by": filter_by,
+        "count": len(results),
+        "recipes": results,
+        "watermark": WATERMARK
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool
+def gh_mass_tree(
+    target: str,
+    format: str = "nested",
+    max_depth: int = 10
+) -> str:
+    """Generates the hierarchical tree or DAG graph structure for an item's mass recipe.
+
+    Args:
+        target: Target item or seed name/ID.
+        format: Output formatting style:
+                - 'nested': Recursive JSON tree (for tree viewers and accordion UIs).
+                - 'flat': Graph with 'nodes' and 'edges' arrays (for SVG/Canvas/D3 visualization).
+                - 'imgui_lua': Ready-to-copy Lua table code for in-game ImGui.TreeNode rendering.
+        max_depth: Maximum recursion depth for tree traversal (default 10).
+
+    Returns:
+        Formatted string (JSON or Lua code) representing the complete recipe hierarchy.
+    """
+    output = MT.tracer.generate_tree(target=target, output_format=format, max_depth=max_depth)
+    if format == "imgui_lua":
+        return output
+    return json.dumps(output, ensure_ascii=False, indent=2)
+
+
+# ===========================================================================
+# BÖLÜM 11 — MULTI-WORLD LOGISTICS & CAPACITY BALANCING (mr_berk edition)
+# ===========================================================================
+
+@mcp.tool
+def gh_logistics_plan(
+    target: str,
+    farm_world: str,
+    storage_worlds: str,
+    only_above_block: bool = True,
+    capacity_override: Optional[int] = None
+) -> str:
+    """Multi-World Logistics & Capacity Balancing Planner (mr_berk edition).
+
+    Generates a complete, multi-world logistics plan for Growtopia mass tree splicing:
+    - Scans target farm capacity C_target respecting AGENTS.md Rule 8 (only_above_block:
+      requires tile fg==0 and below tile fg!=0 with isCollideable==True).
+    - Calculates exact seed quotas using mass_tracer.py (Seed A=N, Seed B=N).
+    - Plans multi-world storage retrieval with fallback routing across storage worlds.
+    - Calculates immediate surplus pruning when collected piles overshoot needed quotas.
+    - Coordinates sequential multi-farm execution (e.g. World 4 fully spliced before World 5).
+
+    Args:
+        target: Target item or seed name/ID (e.g. 'Rock', 'Chandelier', 'Wood Block').
+        farm_world: Target farm world name(s), comma-separated (e.g. 'FARM4, FARM5').
+        storage_worlds: Storage world names or world:amount mappings (e.g. 'STORE1:180, STORE2:300').
+        only_above_block: AGENTS.md Rule 8 soil geometry filter (True = plant only above solid blocks).
+        capacity_override: Optional manual farm capacity override (e.g. 300).
+
+    Returns:
+        JSON string containing the complete multi-world logistics execution plan.
+    """
+    try:
+        plan = LOG.plan_multi_farm_sequence(
+            farm_worlds=farm_world,
+            target_item=target,
+            storage_worlds=storage_worlds,
+            only_above_block=only_above_block,
+            capacity_override=capacity_override
+        )
+        return json.dumps(plan, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "error": str(e),
+            "target": target,
+            "farm_world": farm_world,
+            "watermark": WATERMARK
+        }, ensure_ascii=False, indent=2)
+
+
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import argparse
@@ -1616,9 +1777,10 @@ if __name__ == "__main__":
         # Kayıtlı araçları yazdır (test amaçlı)
         import asyncio
         async def _l():
-            tools = await mcp.get_tools()
+            tools = await mcp.list_tools()
             print(f"{len(tools)} araç kayıtlı:")
-            for name in sorted(tools):
+            for t in sorted(tools, key=lambda x: getattr(x, "name", str(x))):
+                name = getattr(t, "name", str(t))
                 print(f"  • {name}")
         asyncio.run(_l())
     elif args.http:
