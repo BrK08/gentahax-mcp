@@ -151,18 +151,30 @@ _LIVE_MASS_STATE = {
 }
 
 _LAST_SYNC_TIME = 0.0
+_LAST_FAILURE_TIME = 0.0
 _SYNC_LOCK = threading.Lock()
 
 
 def sync_live_game_state(force: bool = False) -> Dict[str, Any]:
-    """Queries real live game state from GentaHAX Lua bridge with 1.0s caching."""
-    global _LAST_SYNC_TIME
+    """Queries real live game state from GentaHAX Lua bridge with caching & failure backoff."""
+    global _LAST_SYNC_TIME, _LAST_FAILURE_TIME
     now = time.time()
+
+    # Backoff if bridge recently timed out or is offline (prevents blocking HTTP requests)
+    if not force and (now - _LAST_FAILURE_TIME) < 5.0:
+        with _STATE_LOCK:
+            return dict(_LIVE_MASS_STATE)
+
     if not force and (now - _LAST_SYNC_TIME) < 1.0:
         with _STATE_LOCK:
             return dict(_LIVE_MASS_STATE)
 
     with _SYNC_LOCK:
+        now = time.time()
+        if not force and (now - _LAST_FAILURE_TIME) < 5.0:
+            with _STATE_LOCK:
+                return dict(_LIVE_MASS_STATE)
+
         if not force and (now - _LAST_SYNC_TIME) < 1.0:
             with _STATE_LOCK:
                 return dict(_LIVE_MASS_STATE)
@@ -178,9 +190,9 @@ def sync_live_game_state(force: bool = False) -> Dict[str, Any]:
             return dict(_LIVE_MASS_STATE)
 
         try:
-            # Query live game state from GentaHAX Lua bridge (mcp_live_full_status or mcp_world_snapshot)
+            # Query live game state from GentaHAX Lua bridge with fast 0.5s timeout
             code = "return (type(mcp_live_full_status)=='function' and mcp_live_full_status()) or (type(mcp_world_snapshot)=='function' and mcp_world_snapshot()) or 'NONE'"
-            raw = exec_lua(code, timeout=1.5)
+            raw = exec_lua(code, timeout=0.5)
             if raw and "WORLD:" in raw:
                 fields = {}
                 for part in raw.split("|"):
@@ -213,16 +225,23 @@ def sync_live_game_state(force: bool = False) -> Dict[str, Any]:
                         _LIVE_MASS_STATE["drop_zone"]["x"] = sanitize_int(fields.get("DROPX", 0), default=0)
                         _LIVE_MASS_STATE["drop_zone"]["y"] = sanitize_int(fields.get("DROPY", 0), default=0)
                         _LIVE_MASS_STATE["drop_zone"]["count"] = sanitize_int(fields.get("DROPC", 0), default=0)
+                _LAST_FAILURE_TIME = 0.0
             else:
+                _LAST_FAILURE_TIME = time.time()
                 with _STATE_LOCK:
                     _LIVE_MASS_STATE["bridge_connected"] = False
                     _LIVE_MASS_STATE["world"] = "DISCONNECTED"
                     _LIVE_MASS_STATE["player"] = "DISCONNECTED"
         except Exception:
+            _LAST_FAILURE_TIME = time.time()
             with _STATE_LOCK:
                 _LIVE_MASS_STATE["bridge_connected"] = False
                 _LIVE_MASS_STATE["world"] = "DISCONNECTED"
                 _LIVE_MASS_STATE["player"] = "DISCONNECTED"
+
+        _LAST_SYNC_TIME = now
+        with _STATE_LOCK:
+            return dict(_LIVE_MASS_STATE)
 
         _LAST_SYNC_TIME = now
         with _STATE_LOCK:
