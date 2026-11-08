@@ -64,9 +64,15 @@ local GH_ENGINE = {
     seed_b_id = 5,       -- Lava Seed
     target_tree_id = 101, -- Wood Tree Seed
     target_block_id = 100, -- Wood Block
-    required_seeds = 300,
     only_above_block = true, -- AGENTS.md Rule 8
     auto_harvest = false,
+    auto_advance_step = true,
+    
+    -- Multi-Tree Pipeline Management (Chandelier, Aqua Block, Rock etc.)
+    target_item_name = "Chandelier",
+    pipeline = {},
+    current_op_index = 1,
+    skipped_ops_count = 0,
     
     -- Scanning & Logistics
     scanned_capacity = 0,
@@ -478,13 +484,103 @@ local function get_inventory_item_count(item_id)
         local inv = type(getInventory) == "function" and getInventory() or GetInventory()
         if type(inv) == "table" or type(inv) == "userdata" then
             for _, it in pairs(inv) do
-                if (type(it) == "table" or type(it) == "userdata") and it.id == item_id then
-                    return tonumber(it.amount) or 0
+                if (type(it) == "table" or type(it) == "userdata") and (it.id == item_id or it.itemID == item_id) then
+                    return tonumber(it.count) or tonumber(it.amount) or 0
                 end
             end
         end
     end
     return 0
+end
+
+-- ------------------------------------------------------------------------------
+-- 4.1 MULTI-STAGE PIPELINE RUNNER & INTERMEDIATE SEED AUTO-DETECTION
+-- ------------------------------------------------------------------------------
+
+local function gh_apply_active_op()
+    if #GH_ENGINE.pipeline == 0 then return end
+    if GH_ENGINE.current_op_index < 1 then GH_ENGINE.current_op_index = 1 end
+    if GH_ENGINE.current_op_index > #GH_ENGINE.pipeline then GH_ENGINE.current_op_index = #GH_ENGINE.pipeline end
+
+    local op = GH_ENGINE.pipeline[GH_ENGINE.current_op_index]
+    if op then
+        GH_ENGINE.seed_a_id = tonumber(op.base_seed_a_id) or GH_ENGINE.seed_a_id
+        GH_ENGINE.seed_b_id = tonumber(op.secondary_seed_b_id) or GH_ENGINE.seed_b_id
+        GH_ENGINE.target_tree_id = tonumber(op.target_seed_id) or GH_ENGINE.target_tree_id
+        GH_ENGINE.target_block_id = tonumber(op.target_item_id) or GH_ENGINE.target_block_id
+        if op.quantity_to_splice and op.quantity_to_splice > 0 then
+            GH_ENGINE.required_seeds = op.quantity_to_splice
+        end
+        GH_ENGINE.status_message = string.format("Active Step #%d / %d: %s (Needs x%d)",
+            GH_ENGINE.current_op_index, #GH_ENGINE.pipeline, op.target_seed or "Tree", GH_ENGINE.required_seeds)
+    end
+end
+
+local function gh_rescan_inventory_and_skip()
+    if #GH_ENGINE.pipeline == 0 then return end
+    local skipped = 0
+    local first_active = nil
+
+    for idx, op in ipairs(GH_ENGINE.pipeline) do
+        local sid = tonumber(op.target_seed_id) or 0
+        local stock = get_inventory_item_count(sid)
+        local needed = tonumber(op.quantity_to_splice) or GH_ENGINE.required_seeds
+        if needed <= 0 then needed = GH_ENGINE.required_seeds end
+
+        if (stock >= needed) or (op.is_satisfied_by_stock == true) then
+            op.is_satisfied_by_stock = true
+            op.in_stock = stock
+            skipped = skipped + 1
+        else
+            op.is_satisfied_by_stock = false
+            op.in_stock = stock
+            if not first_active then
+                first_active = idx
+            end
+        end
+    end
+
+    GH_ENGINE.skipped_ops_count = skipped
+    if first_active then
+        GH_ENGINE.current_op_index = first_active
+    else
+        GH_ENGINE.current_op_index = #GH_ENGINE.pipeline
+    end
+
+    gh_apply_active_op()
+
+    local active_op = GH_ENGINE.pipeline[GH_ENGINE.current_op_index]
+    local act_name = (active_op and active_op.target_seed) or "Target Tree"
+    if type(logToConsole) == "function" then
+        logToConsole(string.format("GEntaHAX: [PIPELINE] Skipped %d in-stock trees. Starting directly at Step #%d (%s)",
+            skipped, GH_ENGINE.current_op_index, act_name))
+    end
+    if type(doToast) == "function" then
+        doToast(1, 4000, string.format("Skipped %d trees! Starting at Step #%d (%s)",
+            skipped, GH_ENGINE.current_op_index, act_name))
+    end
+end
+
+local function gh_load_roadmap_from_relay(target_name, capacity)
+    target_name = target_name or GH_ENGINE.target_item_name or "Chandelier"
+    capacity = tonumber(capacity) or GH_ENGINE.required_seeds or 300
+    local url = string.format("http://127.0.0.1:8809/mass/roadmap?target=%s&capacity=%d", target_name, capacity)
+
+    if type(makeRequest) == "function" then
+        local res = makeRequest(url, "GET", {}, "", 4000)
+        if (type(res) == "table" or type(res) == "userdata") and res.content and #res.content > 0 then
+            local data = json_decode(res.content)
+            if type(data) == "table" and data.ok and type(data.operations) == "table" and #data.operations > 0 then
+                GH_ENGINE.pipeline = data.operations
+                GH_ENGINE.target_item_name = data.target or target_name
+                gh_rescan_inventory_and_skip()
+                GH_ENGINE.status_message = string.format("Roadmap loaded: %d steps. Starting at Step #%d.",
+                    #GH_ENGINE.pipeline, GH_ENGINE.current_op_index)
+                return true
+            end
+        end
+    end
+    return false
 end
 
 -- Soil Geometry Check (Satisfies AGENTS.md Rule 8)
@@ -1098,14 +1194,33 @@ local function on_tick_step(dt)
             return
         end
 
-        -- Check if more trees remain to harvest
         if GH_ENGINE.harvest_index <= #GH_ENGINE.planted_base_coords then
             GH_ENGINE.active_state = STATE_11_HARVESTING
             GH_ENGINE.status_message = "Resuming tree harvesting."
         else
-            GH_ENGINE.active_state = STATE_13_MISSION_COMPLETE
-            GH_ENGINE.status_message = "Mission completed successfully!"
-            save_mass_state(now)
+            if GH_ENGINE.auto_advance_step and GH_ENGINE.pipeline and GH_ENGINE.current_op_index < #GH_ENGINE.pipeline then
+                GH_ENGINE.current_op_index = GH_ENGINE.current_op_index + 1
+                gh_apply_active_op()
+                GH_ENGINE.plant_index = 1
+                GH_ENGINE.splice_index = 1
+                GH_ENGINE.harvest_index = 1
+                GH_ENGINE.planted_base_coords = {}
+                GH_ENGINE.growth_remaining = 3600
+                GH_ENGINE.ready_to_harvest = false
+                GH_ENGINE.active_state = STATE_1_LOAD_PERSISTENCE
+                local next_op = GH_ENGINE.pipeline[GH_ENGINE.current_op_index]
+                local next_name = (next_op and next_op.target_seed) or "Tree"
+                GH_ENGINE.status_message = string.format("Advancing to Step #%d / %d: %s",
+                    GH_ENGINE.current_op_index, #GH_ENGINE.pipeline, next_name)
+                if type(doToast) == "function" then
+                    doToast(1, 5000, string.format("Advancing to Step #%d (%s)!", GH_ENGINE.current_op_index, next_name))
+                end
+                save_mass_state(now)
+            else
+                GH_ENGINE.active_state = STATE_13_MISSION_COMPLETE
+                GH_ENGINE.status_message = "Mission completed successfully!"
+                save_mass_state(now)
+            end
         end
 
     -- STATE 13: MISSION COMPLETE
@@ -1173,7 +1288,55 @@ local function render_imgui_hud()
         ImGui.Separator()
     end
 
-    -- 4. World & Logistics Configuration
+    -- 4. Multi-Tree Pipeline Management & Intermediate Tree Detection
+    ImGui.TextUnformatted("--- Multi-Tree Pipeline Roadmap ---")
+    if type(ImGui.InputText) == "function" and GH_ENGINE.active_state == STATE_0_IDLE then
+        local c_tgt, v_tgt = ImGui.InputText("Target Item", GH_ENGINE.target_item_name or "Chandelier", 32)
+        if c_tgt and type(v_tgt) == "string" and #v_tgt > 0 then
+            GH_ENGINE.target_item_name = v_tgt
+        end
+    else
+        ImGui.TextUnformatted("Target Item: " .. (GH_ENGINE.target_item_name or "Chandelier"))
+    end
+
+    if ImGui.Button("[ Sync Roadmap from Server / MCP ]") then
+        gh_load_roadmap_from_relay(GH_ENGINE.target_item_name, GH_ENGINE.required_seeds)
+    end
+    ImGui.SameLine()
+    if ImGui.Button("[ Rescan Inventory ]") then
+        gh_rescan_inventory_and_skip()
+    end
+
+    if #GH_ENGINE.pipeline > 0 then
+        local op = GH_ENGINE.pipeline[GH_ENGINE.current_op_index] or {}
+        ImGui.TextUnformatted(string.format("Pipeline Step: #%d / %d (%s)",
+            GH_ENGINE.current_op_index, #GH_ENGINE.pipeline, op.target_seed or "Tree"))
+        ImGui.TextUnformatted(string.format("Skipped In-Stock: %d steps | Needs: x%d",
+            GH_ENGINE.skipped_ops_count, GH_ENGINE.required_seeds))
+        ImGui.TextUnformatted(string.format("Recipe: %s + %s",
+            op.base_seed_a or "Seed A", op.secondary_seed_b or "Seed B"))
+
+        if ImGui.Button("[ << Prev Step ]") and GH_ENGINE.current_op_index > 1 then
+            GH_ENGINE.current_op_index = GH_ENGINE.current_op_index - 1
+            gh_apply_active_op()
+        end
+        ImGui.SameLine()
+        if ImGui.Button("[ Next Step >> ]") and GH_ENGINE.current_op_index < #GH_ENGINE.pipeline then
+            GH_ENGINE.current_op_index = GH_ENGINE.current_op_index + 1
+            gh_apply_active_op()
+        end
+    else
+        ImGui.TextUnformatted("Pipeline: Click [ Sync Roadmap ] to load multi-tree chain.")
+    end
+
+    if type(ImGui.Checkbox) == "function" then
+        local adv1, adv2 = ImGui.Checkbox("Auto Advance to Next Tree Step", GH_ENGINE.auto_advance_step)
+        if type(adv2) == "boolean" then GH_ENGINE.auto_advance_step = adv2
+        elseif type(adv1) == "boolean" then GH_ENGINE.auto_advance_step = adv1 end
+    end
+    ImGui.Separator()
+
+    -- 5. World & Logistics Configuration
     ImGui.TextUnformatted("--- World & Target Logistics ---")
     if GH_ENGINE.active_state == STATE_0_IDLE and type(ImGui.InputText) == "function" then
         -- Editable only while IDLE (standalone setup, no MCP / file editing needed)
@@ -1246,6 +1409,9 @@ local function render_imgui_hud()
     -- 6. Engine Operator Controls
     if GH_ENGINE.active_state == STATE_0_IDLE then
         if ImGui.Button("[ Start Mass ]") then
+            if #GH_ENGINE.pipeline > 0 then
+                gh_rescan_inventory_and_skip()
+            end
             GH_ENGINE.active_state = STATE_1_LOAD_PERSISTENCE
             GH_ENGINE.status_message = "Starting Mass Tree automation cycle..."
         end
@@ -1339,6 +1505,9 @@ GH_ENGINE.on_varlist_handler = on_varlist_handler
 GH_ENGINE.on_raw_packet_handler = on_raw_packet_handler
 GH_ENGINE.json_encode = json_encode
 GH_ENGINE.json_decode = json_decode
+GH_ENGINE.apply_active_op = gh_apply_active_op
+GH_ENGINE.rescan_inventory_and_skip = gh_rescan_inventory_and_skip
+GH_ENGINE.load_roadmap_from_relay = gh_load_roadmap_from_relay
 
 _G.GH_MASS_ENGINE = GH_ENGINE
 

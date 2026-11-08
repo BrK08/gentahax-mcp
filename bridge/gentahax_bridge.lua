@@ -160,9 +160,19 @@ function mcp_live_full_status()
     local drop_w = (mass and mass.drop_zone and mass.drop_zone.world) or ""
     local drop_x = (mass and mass.drop_zone and mass.drop_zone.x) or 0
     local drop_y = (mass and mass.drop_zone and mass.drop_zone.y) or 0
-    local drop_c = (mass and mass.drop_zone and mass.drop_zone.count) or 0
-    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d",
-        world_name, player_name, gems, state, statename, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c)
+    local inv_tokens = {}
+    if type(getInventory) == "function" then
+        local inv = getInventory() or {}
+        for _, itm in pairs(inv) do
+            if (type(itm) == "table" or type(itm) == "userdata") and itm.id and itm.count and itm.count > 0 then
+                inv_tokens[#inv_tokens + 1] = tostring(itm.id) .. ":" .. tostring(itm.count)
+            end
+        end
+    end
+    local inv_str = table.concat(inv_tokens, ",")
+
+    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d|INV:%s",
+        world_name, player_name, gems, state, statename, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c, inv_str)
 end
 
 function mcp_player_info()

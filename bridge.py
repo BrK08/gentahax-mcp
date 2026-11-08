@@ -225,6 +225,18 @@ def sync_live_game_state(force: bool = False) -> Dict[str, Any]:
                         _LIVE_MASS_STATE["drop_zone"]["x"] = sanitize_int(fields.get("DROPX", 0), default=0)
                         _LIVE_MASS_STATE["drop_zone"]["y"] = sanitize_int(fields.get("DROPY", 0), default=0)
                         _LIVE_MASS_STATE["drop_zone"]["count"] = sanitize_int(fields.get("DROPC", 0), default=0)
+
+                    # Parse real in-game seed stock from INV tokens
+                    inv_dict = {}
+                    if fields.get("INV"):
+                        for tok in fields["INV"].split(","):
+                            if ":" in tok:
+                                k, v = tok.split(":", 1)
+                                sid = sanitize_int(k, 0)
+                                cnt = sanitize_int(v, 0)
+                                if sid > 0 and cnt > 0:
+                                    inv_dict[sid] = cnt
+                    _LIVE_MASS_STATE["inventory"] = inv_dict
                 _LAST_FAILURE_TIME = 0.0
             else:
                 _LAST_FAILURE_TIME = time.time()
@@ -490,6 +502,9 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
 
                         stock_str = query.get("stock", [None])[0]
                         user_stock = parse_stock_payload(stock_str)
+                        if not user_stock:
+                            with _STATE_LOCK:
+                                user_stock = dict(_LIVE_MASS_STATE.get("inventory", {}))
 
                         raw_prune = query.get("prune_with_stock", ["true"])[0]
                         prune_with_stock = sanitize_bool(raw_prune, default=True)
@@ -504,6 +519,46 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     except Exception as e:
                         result = {"ok": False, "error": f"Trace evaluation error: {str(e)}"}
                     data = json.dumps(result, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif clean_path == "/mass/roadmap":
+                    try:
+                        raw_target = query.get("target", ["Chandelier"])[0]
+                        target = str(raw_target).strip() if raw_target else "Chandelier"
+                        raw_capacity = query.get("capacity", ["300"])[0]
+                        capacity = sanitize_int(raw_capacity, default=300, min_val=1, max_val=10_000)
+
+                        stock_str = query.get("stock", [None])[0]
+                        user_stock = parse_stock_payload(stock_str)
+                        if not user_stock:
+                            with _STATE_LOCK:
+                                user_stock = dict(_LIVE_MASS_STATE.get("inventory", {}))
+
+                        import mass_tracer as MT
+                        result = MT.tracer.trace_dag(
+                            target_query=target,
+                            capacity=capacity,
+                            user_stock=user_stock,
+                            prune_with_stock=True
+                        )
+                        res_payload = {
+                            "ok": True,
+                            "target": target,
+                            "capacity": capacity,
+                            "first_active_step": result["summary"].get("first_active_step", 1),
+                            "first_active_target": result["summary"].get("first_active_target", ""),
+                            "total_operations_count": result["summary"].get("total_operations_count", 0),
+                            "skipped_operations_count": result["summary"].get("skipped_operations_count", 0),
+                            "operations": result.get("flat_operations", [])
+                        }
+                    except Exception as e:
+                        res_payload = {"ok": False, "error": str(e), "operations": []}
+
+                    data = json.dumps(res_payload, ensure_ascii=False).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Access-Control-Allow-Origin", "*")

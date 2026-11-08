@@ -408,6 +408,23 @@ class TestRemediatedAlgorithmicAccuracyAndHardening(unittest.TestCase):
         self.assertEqual(bom["Dirt Seed (3)"]["in_stock"], 10)
         self.assertEqual(bom["Dirt Seed (3)"]["fetch_required"], 0)
 
+    def test_intermediate_seed_detection_and_skip(self):
+        """Verifies that holding intermediate tree seeds automatically skips prior crafts and targets the active tree."""
+        # Aqua Block (4 operations: Grass, Bricks, Glass Pane, Aqua Block)
+        # If user holds 100 Bricks Seeds (ID: 117), Grass and Bricks are skipped, starting from Glass Pane (step 3)
+        res = self.tracer.trace_dag("Aqua Block", capacity=100, user_stock={117: 100}, prune_with_stock=True)
+        summary = res["summary"]
+        self.assertEqual(summary["skipped_operations_count"], 2)
+        self.assertEqual(summary["first_active_step"], 3)
+        self.assertEqual(summary["first_active_target"], "Glass Pane Seed")
+
+        ops = res["flat_operations"]
+        self.assertEqual(len(ops), 4)
+        self.assertTrue(ops[0]["is_satisfied_by_stock"])
+        self.assertTrue(ops[1]["is_satisfied_by_stock"])
+        self.assertFalse(ops[2]["is_satisfied_by_stock"])
+        self.assertTrue(ops[2]["is_first_active_step"])
+
 
 if __name__ == "__main__":
     unittest.main()

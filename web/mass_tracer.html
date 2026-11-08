@@ -1003,9 +1003,15 @@
       loadTrace(currentTarget, currentCapacity);
     }
 
+    let lastInvHash = "";
+
     async function loadTrace(target, capacity) {
       try {
-        const resp = await fetch(`/mass/trace?target=${encodeURIComponent(target)}&capacity=${capacity}`);
+        let stockParam = "";
+        if (liveState && liveState.inventory && Object.keys(liveState.inventory).length > 0) {
+          stockParam = `&stock=${encodeURIComponent(JSON.stringify(liveState.inventory))}`;
+        }
+        const resp = await fetch(`/mass/trace?target=${encodeURIComponent(target)}&capacity=${capacity}${stockParam}`);
         const data = await resp.json();
         if (data.error) {
           alert("Error: " + data.error);
@@ -1030,14 +1036,29 @@
       document.getElementById("targetImg").src = `/sprite/${t.item_id}.png`;
     }
 
+    function autoFitViewport(w, h) {
+      const rect = canvasContainer.getBoundingClientRect();
+      const containerW = rect.width > 0 ? rect.width : 1200;
+      const containerH = rect.height > 0 ? rect.height : 750;
+
+      const scaleX = (containerW - 60) / w;
+      const scaleY = (containerH - 60) / h;
+      zoomLevel = Math.min(1.15, Math.max(0.25, Math.min(scaleX, scaleY)));
+      panX = Math.round((containerW - w * zoomLevel) / 2);
+      panY = Math.max(20, Math.round((containerH - h * zoomLevel) / 2));
+      updateTransform();
+    }
+
     function renderDAG(data) {
       const nodesLayer = document.getElementById("nodesLayer");
       const edgesLayer = document.getElementById("edgesLayer");
       nodesLayer.innerHTML = "";
       edgesLayer.innerHTML = "";
 
-      const nodes = data.dag.nodes;
-      const edges = data.dag.edges;
+      const nodes = data.dag.nodes || [];
+      const edges = data.dag.edges || [];
+
+      if (nodes.length === 0) return;
 
       // Group nodes by tier for hierarchical layout
       const tierMap = {};
@@ -1046,18 +1067,33 @@
         tierMap[n.tier].push(n);
       });
 
-      const maxTier = Math.max(...nodes.map(n => n.tier));
+      const tiers = Object.keys(tierMap).map(Number).sort((a, b) => a - b);
+      const minTier = tiers[0] || 1;
+      const maxTier = tiers[tiers.length - 1] || 1;
+
+      let maxNodesInRow = 1;
+      Object.values(tierMap).forEach(arr => {
+        if (arr.length > maxNodesInRow) maxNodesInRow = arr.length;
+      });
+
+      const nodeWidth = 230;
+      const nodeHeight = 74;
+      const canvasWidth = Math.max(1600, (maxNodesInRow + 1) * 260);
+      const canvasHeight = Math.max(900, (maxTier - minTier + 2) * 140);
+
+      const svg = document.getElementById("dagCanvas");
+      svg.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
+
       const nodePositions = {};
+      const topY = 70;
+      const bottomY = canvasHeight - 120;
+      const tierSpan = Math.max(1, maxTier - minTier);
+      const tierStep = (bottomY - topY) / tierSpan;
 
-      const canvasWidth = 1600;
-      const nodeWidth = 210;
-      const nodeHeight = 68;
-
-      // Layout coordinates
-      Object.keys(tierMap).forEach(tStr => {
-        const t = parseInt(tStr);
+      // Layout coordinates: Root/Target (highest tier) at top, Base seeds at bottom
+      tiers.forEach(t => {
         const rowNodes = tierMap[t];
-        const y = 850 - (t - 1) * 75; // Higher tier near top
+        const y = (maxTier === minTier) ? ((canvasHeight - nodeHeight) / 2) : (topY + (maxTier - t) * tierStep);
         const spacing = canvasWidth / (rowNodes.length + 1);
 
         rowNodes.forEach((n, idx) => {
@@ -1072,27 +1108,37 @@
         const tgt = nodePositions[e.target];
         if (!src || !tgt) return;
 
+        // src is base/ingredient, tgt is spliced product (higher tier, lower y)
         const x1 = src.x + nodeWidth / 2;
-        const y1 = src.y + nodeHeight;
+        const y1 = src.y;
         const x2 = tgt.x + nodeWidth / 2;
-        const y2 = tgt.y;
+        const y2 = tgt.y + nodeHeight;
 
         const pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        const dy = (y2 - y1) / 2;
-        const d = `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
+        const dy = (y1 - y2) / 2;
+        const d = `M ${x1} ${y1} C ${x1} ${y1 - dy}, ${x2} ${y2 + dy}, ${x2} ${y2}`;
         pathEl.setAttribute("d", d);
         pathEl.setAttribute("class", e.is_active ? "dag-edge-active" : "dag-edge-inactive");
         edgesLayer.appendChild(pathEl);
       });
 
+      const firstActiveTarget = (data.summary && data.summary.first_active_target) || "";
+
       // Render Nodes
       Object.values(nodePositions).forEach(pos => {
         const n = pos.node;
         const isAct = n.visual && n.visual.is_active;
+        const demand = n.demand || {};
+        const isSatisfied = demand.is_satisfied_by_stock || (demand.gross_required > 0 && demand.net_deficit === 0);
+        const isPruned = (demand.gross_required === 0 && !n.is_base);
+        const isFirstActive = (firstActiveTarget && (firstActiveTarget === n.seed_name || firstActiveTarget === n.item_name));
 
         const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
         g.setAttribute("class", "dag-node");
         g.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
+        if (isPruned) {
+          g.setAttribute("opacity", "0.55");
+        }
         g.onclick = () => {
           currentTarget = n.item_name;
           loadTrace(currentTarget, currentCapacity);
@@ -1104,45 +1150,58 @@
         rect.setAttribute("width", nodeWidth);
         rect.setAttribute("height", nodeHeight);
         rect.setAttribute("rx", "10");
-        rect.setAttribute("fill", isAct ? "#0B1329" : "#0A0F1D");
-        rect.setAttribute("stroke", isAct ? "#10B981" : "#1E293B");
-        rect.setAttribute("stroke-width", isAct ? "2.5" : "1");
+
+        if (isFirstActive) {
+          rect.setAttribute("fill", "#1E1A0A");
+          rect.setAttribute("stroke", "#F59E0B");
+          rect.setAttribute("stroke-width", "3");
+          rect.setAttribute("filter", "url(#emerald-glow)");
+        } else if (isSatisfied) {
+          rect.setAttribute("fill", "#091A14");
+          rect.setAttribute("stroke", "#10B981");
+          rect.setAttribute("stroke-width", "2.5");
+        } else {
+          rect.setAttribute("fill", isAct ? "#0B1329" : "#0A0F1D");
+          rect.setAttribute("stroke", isAct ? "#10B981" : "#1E293B");
+          rect.setAttribute("stroke-width", isAct ? "2" : "1");
+        }
         g.appendChild(rect);
 
         // Sprite Frame
         const spriteFrame = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         spriteFrame.setAttribute("x", "8");
-        spriteFrame.setAttribute("y", "10");
-        spriteFrame.setAttribute("width", "48");
-        spriteFrame.setAttribute("height", "48");
+        spriteFrame.setAttribute("y", "12");
+        spriteFrame.setAttribute("width", "50");
+        spriteFrame.setAttribute("height", "50");
         spriteFrame.setAttribute("rx", "8");
         spriteFrame.setAttribute("fill", "#1E293B");
-        spriteFrame.setAttribute("stroke", isAct ? "#10B981" : "#334155");
+        spriteFrame.setAttribute("stroke", isFirstActive ? "#F59E0B" : (isAct ? "#10B981" : "#334155"));
         g.appendChild(spriteFrame);
 
         // Sprite Image
         const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
         img.setAttribute("href", `/sprite/${n.item_id}.png`);
-        img.setAttribute("x", "16");
-        img.setAttribute("y", "18");
+        img.setAttribute("x", "17");
+        img.setAttribute("y", "21");
         img.setAttribute("width", "32");
         img.setAttribute("height", "32");
         g.appendChild(img);
 
         // Title Text
         const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        title.setAttribute("x", "64");
+        title.setAttribute("x", "66");
         title.setAttribute("y", "26");
-        title.setAttribute("fill", "#F8FAFC");
+        title.setAttribute("fill", isFirstActive ? "#FCD34D" : "#F8FAFC");
         title.setAttribute("font-size", "11");
-        title.setAttribute("font-weight", "700");
-        title.textContent = n.item_name.length > 18 ? n.item_name.slice(0, 16) + '...' : n.item_name;
+        title.setAttribute("font-weight", "800");
+        const displayName = n.item_name.length > 17 ? n.item_name.slice(0, 15) + '...' : n.item_name;
+        title.textContent = displayName;
         g.appendChild(title);
 
         // Seed ID Pill
         const seedPill = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        seedPill.setAttribute("x", "64");
-        seedPill.setAttribute("y", "34");
+        seedPill.setAttribute("x", "66");
+        seedPill.setAttribute("y", "33");
         seedPill.setAttribute("width", "50");
         seedPill.setAttribute("height", "14");
         seedPill.setAttribute("rx", "3");
@@ -1150,8 +1209,8 @@
         g.appendChild(seedPill);
 
         const seedTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        seedTxt.setAttribute("x", "89");
-        seedTxt.setAttribute("y", "45");
+        seedTxt.setAttribute("x", "91");
+        seedTxt.setAttribute("y", "44");
         seedTxt.setAttribute("fill", "#94A3B8");
         seedTxt.setAttribute("font-size", "8");
         seedTxt.setAttribute("text-anchor", "middle");
@@ -1160,17 +1219,17 @@
 
         // Grow badge
         const growPill = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        growPill.setAttribute("x", "118");
-        growPill.setAttribute("y", "34");
-        growPill.setAttribute("width", "82");
+        growPill.setAttribute("x", "120");
+        growPill.setAttribute("y", "33");
+        growPill.setAttribute("width", "98");
         growPill.setAttribute("height", "14");
         growPill.setAttribute("rx", "3");
         growPill.setAttribute("fill", isAct ? "#064E3B" : "#1E293B");
         g.appendChild(growPill);
 
         const growTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        growTxt.setAttribute("x", "159");
-        growTxt.setAttribute("y", "45");
+        growTxt.setAttribute("x", "169");
+        growTxt.setAttribute("y", "44");
         growTxt.setAttribute("fill", isAct ? "#34D399" : "#64748B");
         growTxt.setAttribute("font-size", "8");
         growTxt.setAttribute("font-weight", "700");
@@ -1178,41 +1237,104 @@
         growTxt.textContent = `⏱️ ${n.growth_time_formatted}`;
         g.appendChild(growTxt);
 
-        // Quantity Needed
-        const qtyTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        qtyTxt.setAttribute("x", "200");
-        qtyTxt.setAttribute("y", "26");
-        qtyTxt.setAttribute("fill", isAct ? "#10B981" : "#64748B");
-        qtyTxt.setAttribute("font-size", "10");
-        qtyTxt.setAttribute("font-weight", "800");
-        qtyTxt.setAttribute("text-anchor", "end");
-        qtyTxt.textContent = `x${n.demand.gross_required || currentCapacity}`;
-        g.appendChild(qtyTxt);
+        // Bottom status badge: Stock / Active / Pruned
+        const statusPill = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        statusPill.setAttribute("x", "66");
+        statusPill.setAttribute("y", "51");
+        statusPill.setAttribute("width", "152");
+        statusPill.setAttribute("height", "15");
+        statusPill.setAttribute("rx", "3");
+
+        const statusTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        statusTxt.setAttribute("x", "142");
+        statusTxt.setAttribute("y", "62");
+        statusTxt.setAttribute("font-size", "8");
+        statusTxt.setAttribute("font-weight", "800");
+        statusTxt.setAttribute("text-anchor", "middle");
+
+        if (isFirstActive) {
+          statusPill.setAttribute("fill", "#78350F");
+          statusTxt.setAttribute("fill", "#FDE68A");
+          statusTxt.textContent = `🎯 BAŞLANGIÇ ADIMI`;
+        } else if (isSatisfied) {
+          statusPill.setAttribute("fill", "#064E3B");
+          statusTxt.setAttribute("fill", "#6EE7B7");
+          statusTxt.textContent = `✅ STOKTA: ${demand.user_stock || 0} (ATLANDI)`;
+        } else if (isPruned) {
+          statusPill.setAttribute("fill", "#1E293B");
+          statusTxt.setAttribute("fill", "#64748B");
+          statusTxt.textContent = `[GEREK YOK / ATLANDI]`;
+        } else {
+          statusPill.setAttribute("fill", "#1E293B");
+          statusTxt.setAttribute("fill", "#38BDF8");
+          const net = (demand.net_deficit !== undefined) ? demand.net_deficit : (demand.gross_required || currentCapacity);
+          statusTxt.textContent = `⚡ GEREKEN: x${net}`;
+        }
+
+        g.appendChild(statusPill);
+        g.appendChild(statusTxt);
 
         nodesLayer.appendChild(g);
       });
+
+      autoFitViewport(canvasWidth, canvasHeight);
     }
 
     function renderRoadmap(data) {
       const list = document.getElementById("roadmapList");
       list.innerHTML = "";
       const stages = data.execution_roadmap || [];
-      document.getElementById("roadmapCountBadge").textContent = `${stages.length} Phases`;
+      const flatOps = data.flat_operations || [];
+      const summary = data.summary || {};
+      const skippedCount = summary.skipped_operations_count || 0;
+      const totalCount = summary.total_operations_count || flatOps.length;
+      const firstActiveStep = summary.first_active_step || 1;
+      const firstActiveTarget = summary.first_active_target || "";
+
+      document.getElementById("roadmapCountBadge").textContent = `${stages.length} Phases (${totalCount} Crafts)`;
+
+      // Prominent Active Starting Step Banner
+      if (flatOps.length > 0) {
+        const banner = document.createElement("div");
+        banner.style.cssText = "background: rgba(245, 158, 11, 0.12); border: 1px solid #F59E0B; border-radius: 6px; padding: 10px; margin-bottom: 12px;";
+        banner.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong style="color: #FCD34D; font-size: 13px;">🎯 BAŞLANGIÇ: Adım #${firstActiveStep} (${firstActiveTarget})</strong>
+            <span class="pill pill-emerald">${skippedCount} / ${totalCount} Atlandı</span>
+          </div>
+          <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+            Envanterinizdeki intermediate tohumlar algılandı. Önceki tamamlanmış adımlar atlandı, bot doğrudan <strong>${firstActiveTarget}</strong> aşamasından başlayacak.
+          </p>
+        `;
+        list.appendChild(banner);
+      }
 
       stages.forEach(st => {
         const block = document.createElement("div");
         block.className = "stage-block";
 
         let opsHtml = "";
-        st.operations.forEach((op, opIdx) => {
+        st.operations.forEach((op) => {
+          const isSkipped = op.is_satisfied_by_stock;
+          const isFirstActive = op.is_first_active_step;
+          const borderStyle = isFirstActive ? "border-left: 3px solid #F59E0B; background: rgba(245, 158, 11, 0.08); padding: 6px; border-radius: 4px;" : (isSkipped ? "opacity: 0.6;" : "");
+
           opsHtml += `
-            <div class="operation-item">
-              <input type="checkbox" id="chk_${st.tier}_${opIdx}">
-              <div>
-                <strong>${op.target_seed}</strong> (x${op.quantity_to_splice})<br>
-                <span style="color:var(--text-muted); font-size:11px;">
-                  Splice <strong>${op.base_seed_a}</strong> + <strong>${op.secondary_seed_b}</strong> | ⏱️ ${op.growth_time_formatted}
-                </span>
+            <div class="operation-item" style="margin-bottom: 6px; ${borderStyle}">
+              <input type="checkbox" id="chk_${op.step_number}" ${isSkipped ? 'checked' : ''} style="accent-color: #10B981; margin-top: 3px;">
+              <div style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: 700; color: ${isFirstActive ? '#FCD34D' : (isSkipped ? '#94A3B8' : '#F8FAFC')};">
+                    ${isFirstActive ? '🎯 ' : (isSkipped ? '✅ ' : '⚡ ')}Adım #${op.step_number}: ${op.target_seed}
+                  </span>
+                  <span class="pill ${isFirstActive ? 'pill-emerald' : ''}" style="font-size: 9px; ${isFirstActive ? 'background:#B45309; color:#FEF3C7;' : ''}">
+                    ${op.status_label || (isSkipped ? 'Atlandı' : `x${op.quantity_to_splice}`)}
+                  </span>
+                </div>
+                <div style="color:var(--text-muted); font-size:11px; margin-top: 2px;">
+                  Splicing: <strong>${op.base_seed_a}</strong> + <strong>${op.secondary_seed_b}</strong> | ⏱️ ${op.growth_time_formatted}
+                  ${op.in_stock > 0 ? ` | Envanter: <strong style="color:#10B981;">x${op.in_stock}</strong>` : ''}
+                </div>
               </div>
             </div>
           `;
@@ -1453,6 +1575,12 @@
           document.getElementById("hudStatusDesc").textContent = "Trees Ready for Harvest!";
           document.getElementById("btnHarvest").className = "harvest-btn ready";
           document.getElementById("btnHarvest").textContent = "⚡ HARVEST ET (Hemen Başlat)";
+        }
+        // Auto-refresh DAG and Roadmap when live backpack inventory updates
+        const curInvHash = JSON.stringify(data.inventory || {});
+        if (curInvHash !== lastInvHash) {
+          lastInvHash = curInvHash;
+          loadTrace(currentTarget, currentCapacity);
         }
       } catch (e) {
         // silent error in polling

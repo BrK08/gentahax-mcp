@@ -512,22 +512,47 @@ class MassTreeTracer:
                 }
 
         stages = defaultdict(list)
+        flat_operations = []
+        op_step_num = 1
+        first_active_step = None
+
         for s_id in topo_order:
             if not nodes[s_id]["is_base"] and s_id in adj:
                 t = nodes[s_id]["tier"]
                 c1, c2 = adj[s_id]
-                stages[t].append({
+                craft_needed = net_deficit[s_id] if prune_with_stock else gross_demand[s_id]
+                stock_avail = user_stock.get(s_id, 0)
+                # An operation is skipped if user has enough stock or its demand was pruned
+                is_skipped = (craft_needed == 0 and stock_avail >= gross_demand[s_id]) or (gross_demand[s_id] == 0)
+
+                op_entry = {
+                    "step_number": op_step_num,
                     "target_seed": nodes[s_id]["seed_name"],
                     "target_seed_id": s_id,
                     "target_item_id": nodes[s_id]["item_id"],
-                    "quantity_to_splice": net_deficit[s_id] if prune_with_stock else gross_demand[s_id],
+                    "gross_demand": gross_demand[s_id],
+                    "in_stock": stock_avail,
+                    "quantity_to_splice": craft_needed,
                     "base_seed_a": nodes[c1]["seed_name"],
                     "base_seed_a_id": c1,
                     "secondary_seed_b": nodes[c2]["seed_name"],
                     "secondary_seed_b_id": c2,
                     "growth_time_seconds": nodes[s_id]["growth_time_seconds"],
-                    "growth_time_formatted": nodes[s_id]["growth_time_formatted"]
-                })
+                    "growth_time_formatted": nodes[s_id]["growth_time_formatted"],
+                    "is_satisfied_by_stock": is_skipped,
+                    "status": "SKIPPED_IN_STOCK" if is_skipped else "ACTIVE_CRAFT",
+                    "status_label": f"✅ Stokta Var (x{stock_avail}) — Atlandı" if is_skipped else f"⚡ Üretilecek (x{craft_needed})"
+                }
+
+                if not is_skipped and first_active_step is None:
+                    first_active_step = op_step_num
+                    op_entry["is_first_active_step"] = True
+                else:
+                    op_entry["is_first_active_step"] = False
+
+                stages[t].append(op_entry)
+                flat_operations.append(op_entry)
+                op_step_num += 1
 
         execution_roadmap = [
             {
@@ -539,6 +564,7 @@ class MassTreeTracer:
         ]
 
         target_node = nodes[target_seed_id]
+        skipped_count = sum(1 for op in flat_operations if op["is_satisfied_by_stock"])
 
         return {
             "target": {
@@ -556,9 +582,14 @@ class MassTreeTracer:
                 "total_unique_seeds": len(nodes),
                 "tier_depth": target_node["tier"],
                 "base_seeds_bill_of_materials": base_bom,
-                "execution_stages_count": len(execution_roadmap)
+                "execution_stages_count": len(execution_roadmap),
+                "total_operations_count": len(flat_operations),
+                "skipped_operations_count": skipped_count,
+                "first_active_step": first_active_step or 1,
+                "first_active_target": flat_operations[first_active_step - 1]["target_seed"] if (first_active_step and first_active_step <= len(flat_operations)) else target_node["seed_name"]
             },
             "execution_roadmap": execution_roadmap,
+            "flat_operations": flat_operations,
             "dag": {
                 "nodes": list(nodes.values()),
                 "edges": edges
