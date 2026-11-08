@@ -121,6 +121,16 @@ local GH_ENGINE = {
 _G.GH_MASS_ENGINE = GH_ENGINE
 _G.GH_MASS_STATE_NAMES = STATE_NAMES
 
+local function get_current_world_name()
+    if type(getWorld) == "function" then
+        local w = getWorld()
+        if (type(w) == "table" or type(w) == "userdata") and w.name then
+            return tostring(w.name)
+        end
+    end
+    return ""
+end
+
 local function get_player_tile_pos()
     local me = (type(getLocal) == "function" and getLocal()) or (type(GetLocal) == "function" and GetLocal())
     if not me then return nil, nil end
@@ -584,16 +594,6 @@ end
 -- ------------------------------------------------------------------------------
 -- 5. WORLD, INVENTORY & GROUND-TRUTH HELPERS
 -- ------------------------------------------------------------------------------
-
-local function get_current_world_name()
-    if type(getWorld) == "function" then
-        local w = getWorld()
-        if (type(w) == "table" or type(w) == "userdata") and w.name then
-            return tostring(w.name)
-        end
-    end
-    return ""
-end
 
 local function get_inventory_item_count(item_id)
     if type(getInventory) == "function" or type(GetInventory) == "function" then
