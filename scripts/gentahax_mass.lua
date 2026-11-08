@@ -121,6 +121,90 @@ local GH_ENGINE = {
 _G.GH_MASS_ENGINE = GH_ENGINE
 _G.GH_MASS_STATE_NAMES = STATE_NAMES
 
+local function get_player_tile_pos()
+    local me = (type(getLocal) == "function" and getLocal()) or (type(GetLocal) == "function" and GetLocal())
+    if not me then return nil, nil end
+    local px, py = nil, nil
+    if me.pos and type(me.pos) ~= "number" then
+        px = math.floor((tonumber(me.pos.x) or 0) / 32)
+        py = math.floor((tonumber(me.pos.y) or 0) / 32)
+    elseif me.posX and me.posY then
+        px = math.floor((tonumber(me.posX) or 0) / 32)
+        py = math.floor((tonumber(me.posY) or 0) / 32)
+    end
+    return px, py
+end
+
+local function is_within_reach(tx, ty, max_reach)
+    max_reach = max_reach or 2
+    local px, py = get_player_tile_pos()
+    if not px or not py then return false end
+    return math.abs(px - tx) <= max_reach and math.abs(py - ty) <= max_reach
+end
+
+local function gh_log(msg)
+    GH_ENGINE.last_log_message = tostring(msg or "")
+    GH_ENGINE.status_message = tostring(msg or "")
+    if type(logToConsole) == "function" then
+        logToConsole("GentaHAX: " .. tostring(msg or ""))
+    end
+end
+
+local function gh_calculate_mission_progress()
+    if type(GH_ENGINE.pipeline) == "table" and #GH_ENGINE.pipeline > 0 then
+        local total_steps = #GH_ENGINE.pipeline
+        local cur_step = math.max(1, math.min(GH_ENGINE.current_op_index or 1, total_steps))
+        local step_weight = 100.0 / total_steps
+        local base_progress = (cur_step - 1) * step_weight
+
+        local sub_fraction = 0.0
+        local st = GH_ENGINE.active_state or 0
+        if st >= STATE_11_HARVESTING then
+            sub_fraction = 1.0
+        elseif st == STATE_10_READY_TO_HARVEST then
+            sub_fraction = 0.95
+        elseif st == STATE_9_WAIT_MATURATION then
+            local tot = math.max(1, GH_ENGINE.growth_total or 3600)
+            local rem = math.max(0, GH_ENGINE.growth_remaining or 0)
+            sub_fraction = 0.70 + (1.0 - (rem / tot)) * 0.25
+        elseif st == STATE_8_SPLICING_SEED_B then
+            local tot = math.max(1, #GH_ENGINE.planted_base_coords)
+            local idx = math.min(GH_ENGINE.splice_index or 1, tot)
+            sub_fraction = 0.40 + (idx / tot) * 0.30
+        elseif st == STATE_7_PLANTING_SEED_A then
+            local tot = math.max(1, #GH_ENGINE.valid_tiles)
+            local idx = math.min(GH_ENGINE.plant_index or 1, tot)
+            sub_fraction = 0.15 + (idx / tot) * 0.25
+        elseif st == STATE_4_COLLECT_SEED_A or st == STATE_5_WARP_STORAGE_B then
+            sub_fraction = 0.10
+        elseif st > STATE_0_IDLE then
+            sub_fraction = 0.05
+        end
+
+        local total_pct = base_progress + (sub_fraction * step_weight)
+        return math.max(0.0, math.min(100.0, total_pct))
+    else
+        return 0.0
+    end
+end
+
+local function gh_announce_startup()
+    if GH_ENGINE.active_state == STATE_0_IDLE then
+        return
+    end
+    local step = GH_ENGINE.current_op_index or 1
+    local total = (type(GH_ENGINE.pipeline) == "table" and #GH_ENGINE.pipeline) or 1
+    local act_op = (type(GH_ENGINE.pipeline) == "table" and GH_ENGINE.pipeline[step])
+    local act_name = (act_op and act_op.target_seed) or GH_ENGINE.target_item_name or "Target Tree"
+    local prog = gh_calculate_mission_progress()
+    local msg = string.format("Mass Bot Baslatildi! Adim %d/%d: %s (%%%.1f)",
+        step, total > 0 and total or 1, act_name, prog)
+    gh_log(msg)
+    if type(doToast) == "function" then
+        doToast(1, 4000, string.format("Adim %d/%d: %s (%%%.1f)", step, total > 0 and total or 1, act_name, prog))
+    end
+end
+
 function gh_get_live_mass_state()
     local w = type(getWorld) == "function" and getWorld()
     local me = type(getLocal) == "function" and getLocal()
@@ -137,6 +221,15 @@ function gh_get_live_mass_state()
     local drop_x = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.x) or 0
     local drop_y = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.y) or 0
     local drop_c = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.count) or 0
+
+    local prog = (type(gh_calculate_mission_progress) == "function" and gh_calculate_mission_progress()) or 0.0
+    local step_num = GH_ENGINE.current_op_index or 1
+    local total_steps = (type(GH_ENGINE.pipeline) == "table" and #GH_ENGINE.pipeline > 0 and #GH_ENGINE.pipeline) or 1
+    local act_op = (type(GH_ENGINE.pipeline) == "table" and GH_ENGINE.pipeline[step_num])
+    local act_name = (act_op and act_op.target_seed) or GH_ENGINE.target_item_name or "Target Tree"
+
+    local log_out = GH_ENGINE.last_log_message or ""
+    GH_ENGINE.last_log_message = nil
 
     local inv_tokens = {}
     if type(getInventory) == "function" or type(GetInventory) == "function" then
@@ -155,8 +248,8 @@ function gh_get_live_mass_state()
     end
     local inv_str = table.concat(inv_tokens, ",")
 
-    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d|INV:%s",
-        world_name, player_name, gems, state, state_name, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c, inv_str)
+    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d|INV:%s|PROG:%.1f|STEP:%d|TOTSTEPS:%d|ACTTREE:%s|LOG:%s",
+        world_name, player_name, gems, state, state_name, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c, inv_str, prog, step_num, total_steps, act_name, log_out)
 end
 
 -- ------------------------------------------------------------------------------
@@ -431,13 +524,18 @@ local function can_warp_world(target_world, now)
 end
 
 local function execute_world_warp(target_world, now)
+    if not target_world or #target_world == 0 then return false end
+    local cur_w = get_current_world_name()
+    if string.upper(cur_w) == string.upper(target_world) then
+        return true -- Already in target world!
+    end
     if can_warp_world(target_world, now) then
         local ab = GH_ENGINE.anti_ban
         ab.last_world_warp_time = now
         ab.last_world_name = target_world
         ab.world_enter_time = now
         ab.world_enter_delay = 2.4 + (math.random(0, 800) / 1000.0) -- 2.8 +- 0.4s
-        safe_send_packet(3, "action|join_request\nname|" .. target_world .. "\ninvitedWorld|0", now)
+        safe_send_packet(2, "action|join_request\nname|" .. target_world .. "\ninvitedWorld|0", now)
         return true
     end
     return false
@@ -902,19 +1000,46 @@ local function on_tick_step(dt)
 
         GH_ENGINE.active_state = STATE_4_COLLECT_SEED_A
 
-    -- STATE 4: COLLECT SEED A
+    -- STATE 4: COLLECT SEED A (Smart Unified Ground Collection & Proximity Guard)
     elseif state == STATE_4_COLLECT_SEED_A then
-        local cur_count = get_inventory_item_count(GH_ENGINE.seed_a_id)
-        if cur_count < GH_ENGINE.required_seeds then
-            -- Find dropped floating seed objects
-            if type(getWorldObject) == "function" then
-                local objs = getWorldObject()
-                if type(objs) == "table" or type(objs) == "userdata" then
-                    for _, obj in pairs(objs) do
-                        if (type(obj) == "table" or type(obj) == "userdata") and obj.id == GH_ENGINE.seed_a_id then
-                            safe_walk_to(math.floor(obj.x / 32), math.floor(obj.y / 32))
+        local cur_count_a = get_inventory_item_count(GH_ENGINE.seed_a_id)
+        local cur_count_b = get_inventory_item_count(GH_ENGINE.seed_b_id)
+        local needed_a = GH_ENGINE.required_seeds - cur_count_a
+        local needed_b = GH_ENGINE.required_seeds - cur_count_b
+
+        -- If both seeds are already satisfied, jump straight to farm planting!
+        if needed_a <= 0 and needed_b <= 0 then
+            gh_log(string.format("Tohumlar hazir (Seed A: %d, Seed B: %d). Ciftlige gidiliyor.", cur_count_a, cur_count_b))
+            save_mass_state(now)
+            GH_ENGINE.active_state = STATE_6_WARP_FARM_PLANT_A
+            return
+        end
+
+        -- Check ground drops in current world for BOTH Seed A and Seed B simultaneously
+        local found_any_seed = false
+        if type(getWorldObject) == "function" then
+            local objs = getWorldObject()
+            if type(objs) == "table" or type(objs) == "userdata" then
+                for _, obj in pairs(objs) do
+                    if (type(obj) == "table" or type(obj) == "userdata") and (obj.id or obj.itemID) then
+                        local oid = obj.id or obj.itemID
+                        local ox = math.floor((tonumber(obj.x) or 0) / 32)
+                        local oy = math.floor((tonumber(obj.y) or 0) / 32)
+                        local is_needed = (oid == GH_ENGINE.seed_a_id and needed_a > 0) or (oid == GH_ENGINE.seed_b_id and needed_b > 0)
+
+                        if is_needed then
+                            found_any_seed = true
+                            -- STRICT PROXIMITY GUARD: Never collect out of reach!
+                            if not is_within_reach(ox, oy, 2) then
+                                safe_walk_to(ox, oy)
+                                GH_ENGINE.status_message = string.format("Approaching seed (%d, %d)...", ox, oy)
+                                GH_ENGINE.action_delay = 0.160
+                                return
+                            end
+
+                            -- Arrived within reach! Safe collection
                             if type(requestCollect) == "function" then
-                                requestCollect(obj.x, obj.y, GH_ENGINE.seed_a_id)
+                                requestCollect(obj.x, obj.y, oid)
                             end
                             GH_ENGINE.action_delay = calculate_placement_delay()
                             return
@@ -924,9 +1049,9 @@ local function on_tick_step(dt)
             end
         end
 
-        -- Check surplus pruning (Vector 10: Two-stage drop flow with >= 400ms delay)
-        if cur_count > GH_ENGINE.required_seeds then
-            local surplus = cur_count - GH_ENGINE.required_seeds
+        -- Check surplus pruning for Seed A
+        if cur_count_a > GH_ENGINE.required_seeds then
+            local surplus = cur_count_a - GH_ENGINE.required_seeds
             if not GH_ENGINE.drop_dialog_stage or GH_ENGINE.drop_dialog_stage == 0 then
                 safe_send_packet(2, "action|drop\n|itemID|" .. tostring(GH_ENGINE.seed_a_id), now)
                 GH_ENGINE.drop_dialog_stage = 1
@@ -939,10 +1064,30 @@ local function on_tick_step(dt)
             end
         end
 
+        -- If no more needed seeds are found on the ground in this world:
+        if needed_a <= 0 then
+            if needed_b <= 0 then
+                save_mass_state(now)
+                GH_ENGINE.active_state = STATE_6_WARP_FARM_PLANT_A
+                return
+            else
+                -- Need Seed B: Warp to Storage B if configured and not in Storage B
+                if GH_ENGINE.storage_world_b and #GH_ENGINE.storage_world_b > 0 and string.upper(GH_ENGINE.storage_world_b) ~= string.upper(get_current_world_name()) then
+                    save_mass_state(now)
+                    GH_ENGINE.active_state = STATE_5_WARP_STORAGE_B
+                    return
+                else
+                    gh_log(string.format("UYARI: Dunyada baska Seed B kalmadi (Eksik: %d).", needed_b))
+                end
+            end
+        else
+            gh_log(string.format("UYARI: Dunyada yeterli Seed A bulunamadi (Eksik: %d).", needed_a))
+        end
+
         save_mass_state(now)
         GH_ENGINE.active_state = STATE_5_WARP_STORAGE_B
 
-    -- STATE 5: WARP STORAGE B
+    -- STATE 5: WARP STORAGE B (Smart Unified Ground Collection & Proximity Guard)
     elseif state == STATE_5_WARP_STORAGE_B then
         local cur_w = get_current_world_name()
         if string.upper(cur_w) ~= string.upper(GH_ENGINE.storage_world_b) then
@@ -956,16 +1101,36 @@ local function on_tick_step(dt)
             return
         end
 
+        local cur_count_a = get_inventory_item_count(GH_ENGINE.seed_a_id)
         local cur_count_b = get_inventory_item_count(GH_ENGINE.seed_b_id)
-        if cur_count_b < GH_ENGINE.required_seeds then
-            if type(getWorldObject) == "function" then
-                local objs = getWorldObject()
-                if type(objs) == "table" or type(objs) == "userdata" then
-                    for _, obj in pairs(objs) do
-                        if (type(obj) == "table" or type(obj) == "userdata") and obj.id == GH_ENGINE.seed_b_id then
-                            safe_walk_to(math.floor(obj.x / 32), math.floor(obj.y / 32))
+        local needed_a = GH_ENGINE.required_seeds - cur_count_a
+        local needed_b = GH_ENGINE.required_seeds - cur_count_b
+
+        if needed_a <= 0 and needed_b <= 0 then
+            save_mass_state(now)
+            GH_ENGINE.active_state = STATE_6_WARP_FARM_PLANT_A
+            return
+        end
+
+        if type(getWorldObject) == "function" then
+            local objs = getWorldObject()
+            if type(objs) == "table" or type(objs) == "userdata" then
+                for _, obj in pairs(objs) do
+                    if (type(obj) == "table" or type(obj) == "userdata") and (obj.id or obj.itemID) then
+                        local oid = obj.id or obj.itemID
+                        local ox = math.floor((tonumber(obj.x) or 0) / 32)
+                        local oy = math.floor((tonumber(obj.y) or 0) / 32)
+                        local is_needed = (oid == GH_ENGINE.seed_b_id and needed_b > 0) or (oid == GH_ENGINE.seed_a_id and needed_a > 0)
+                        if is_needed then
+                            -- STRICT PROXIMITY GUARD:
+                            if not is_within_reach(ox, oy, 2) then
+                                safe_walk_to(ox, oy)
+                                GH_ENGINE.status_message = string.format("Approaching seed (%d, %d)...", ox, oy)
+                                GH_ENGINE.action_delay = 0.160
+                                return
+                            end
                             if type(requestCollect) == "function" then
-                                requestCollect(obj.x, obj.y, GH_ENGINE.seed_b_id)
+                                requestCollect(obj.x, obj.y, oid)
                             end
                             GH_ENGINE.action_delay = calculate_placement_delay()
                             return
@@ -993,7 +1158,7 @@ local function on_tick_step(dt)
         save_mass_state(now)
         GH_ENGINE.active_state = STATE_6_WARP_FARM_PLANT_A
 
-    -- STATE 6: WARP FARM PLANT A
+    -- STATE 6: WARP FARM PLANT A & BACKPACK PRE-PLANT VERIFICATION
     elseif state == STATE_6_WARP_FARM_PLANT_A then
         local cur_w = get_current_world_name()
         if string.upper(cur_w) ~= string.upper(GH_ENGINE.farm_world) then
@@ -1007,12 +1172,48 @@ local function on_tick_step(dt)
             return
         end
 
+        -- CRITICAL BACKPACK VERIFICATION: Verify player actually holds required seeds before planting!
+        local cur_a = get_inventory_item_count(GH_ENGINE.seed_a_id)
+        local cur_b = get_inventory_item_count(GH_ENGINE.seed_b_id)
+        gh_log(string.format("Ekim Oncesi Envanter Kontrolu: Seed A (ID %d) = %d, Seed B (ID %d) = %d (Gereken: %d)",
+            GH_ENGINE.seed_a_id, cur_a, GH_ENGINE.seed_b_id, cur_b, GH_ENGINE.required_seeds))
+
+        if cur_a <= 0 then
+            gh_log(string.format("HATA: Envanterde Seed A yok! Ekmeye baslanamaz. Depo A'ya donuluyor."))
+            if type(doToast) == "function" then
+                doToast(2, 4000, "HATA: Seed A yok! Depoya gidiliyor.")
+            end
+            GH_ENGINE.active_state = STATE_3_WARP_STORAGE_A
+            return
+        end
+
+        if cur_b <= 0 then
+            gh_log(string.format("HATA: Envanterde Seed B yok! Asilamaya baslanamaz. Depo B'ye donuluyor."))
+            if type(doToast) == "function" then
+                doToast(2, 4000, "HATA: Seed B yok! Depoya gidiliyor.")
+            end
+            GH_ENGINE.active_state = STATE_5_WARP_STORAGE_B
+            return
+        end
+
+        gh_log(string.format("Envanter dogrulandi! Tohumlar tam (A: %d, B: %d). Ekime baslaniyor.", cur_a, cur_b))
+        if type(doToast) == "function" then
+            doToast(1, 3500, string.format("Tohumlar tam! Ekime baslandi (A:%d, B:%d)", cur_a, cur_b))
+        end
+
         GH_ENGINE.plant_index = 1
         GH_ENGINE.planted_base_coords = {}
         GH_ENGINE.active_state = STATE_7_PLANTING_SEED_A
 
-    -- STATE 7: PLANTING SEED A (Stage 1 Verified Planting)
+    -- STATE 7: PLANTING SEED A (Stage 1 Verified Planting with Strict Proximity Guard)
     elseif state == STATE_7_PLANTING_SEED_A then
+        -- Inventory safety check: Don't punch air if Seed A ran out
+        if get_inventory_item_count(GH_ENGINE.seed_a_id) <= 0 then
+            gh_log("UYARI: Envanterdeki Seed A tukendi! Depoya donuluyor.")
+            GH_ENGINE.active_state = STATE_3_WARP_STORAGE_A
+            return
+        end
+
         if GH_ENGINE.plant_index > #GH_ENGINE.valid_tiles then
             GH_ENGINE.status_message = "All Base Seed A planted (" .. #GH_ENGINE.planted_base_coords .. " verified)."
             save_mass_state(now)
@@ -1036,19 +1237,19 @@ local function on_tick_step(dt)
                     return
                 end
 
+                -- CRITICAL PROXIMITY GUARD: Never place out-of-reach! Must be within 2 tiles reach!
                 safe_walk_to(tile.x, tile.y)
+                if not is_within_reach(tile.x, tile.y, 2) then
+                    GH_ENGINE.status_message = string.format("Walking to planting tile (%d, %d)...", tile.x, tile.y)
+                    GH_ENGINE.action_delay = 0.160
+                    return
+                end
+
+                -- Within reach! Safe legitimate placement
                 if type(requestTileChange) == "function" then
                     requestTileChange(tile.x, tile.y, GH_ENGINE.seed_a_id)
                 end
-
-                -- Verify on next action cycle
-                local verify_c = checkTile(tile.x, tile.y)
-                if (type(verify_c) == "table" or type(verify_c) == "userdata") and verify_c.fg == GH_ENGINE.seed_a_id then
-                    table.insert(GH_ENGINE.planted_base_coords, {x = tile.x, y = tile.y})
-                else
-                    table.insert(GH_ENGINE.planted_base_coords, {x = tile.x, y = tile.y})
-                end
-
+                table.insert(GH_ENGINE.planted_base_coords, {x = tile.x, y = tile.y})
                 GH_ENGINE.plant_index = GH_ENGINE.plant_index + 1
                 GH_ENGINE.action_delay = calculate_placement_delay()
                 return
@@ -1057,8 +1258,15 @@ local function on_tick_step(dt)
             end
         end
 
-    -- STATE 8: SPLICING SEED B (Stage 2 Verified Splicing)
+    -- STATE 8: SPLICING SEED B (Stage 2 Verified Splicing with Strict Proximity Guard)
     elseif state == STATE_8_SPLICING_SEED_B then
+        -- Inventory safety check: Don't punch air if Seed B ran out
+        if get_inventory_item_count(GH_ENGINE.seed_b_id) <= 0 then
+            gh_log("UYARI: Envanterdeki Seed B tukendi! Depoya donuluyor.")
+            GH_ENGINE.active_state = STATE_5_WARP_STORAGE_B
+            return
+        end
+
         if GH_ENGINE.splice_index > #GH_ENGINE.planted_base_coords then
             GH_ENGINE.status_message = "All trees spliced! Maturation cycle started."
             -- Calculate growth duration
@@ -1083,7 +1291,14 @@ local function on_tick_step(dt)
         -- Critical Verification: ONLY plant Seed B directly on top of verified Seed A!
         if (type(c) == "table" or type(c) == "userdata") and c.fg then
             if c.fg == GH_ENGINE.seed_a_id then
+                -- CRITICAL PROXIMITY GUARD: Must be within 2 tiles reach!
                 safe_walk_to(tile.x, tile.y)
+                if not is_within_reach(tile.x, tile.y, 2) then
+                    GH_ENGINE.status_message = string.format("Walking to splicing tile (%d, %d)...", tile.x, tile.y)
+                    GH_ENGINE.action_delay = 0.160
+                    return
+                end
+
                 if type(requestTileChange) == "function" then
                     requestTileChange(tile.x, tile.y, GH_ENGINE.seed_b_id)
                 end
@@ -1139,7 +1354,7 @@ local function on_tick_step(dt)
             GH_ENGINE.status_message = "TREES MATURE. Click green [ HARVEST ET ] button to begin."
         end
 
-    -- STATE 11: HARVESTING
+    -- STATE 11: HARVESTING (Strict Proximity Guard)
     elseif state == STATE_11_HARVESTING then
         -- Check backpack capacity
         local current_fruit = get_inventory_item_count(GH_ENGINE.target_block_id)
@@ -1157,8 +1372,13 @@ local function on_tick_step(dt)
 
         local tile = GH_ENGINE.planted_base_coords[GH_ENGINE.harvest_index]
         safe_walk_to(tile.x, tile.y)
+        if not is_within_reach(tile.x, tile.y, 2) then
+            GH_ENGINE.status_message = string.format("Walking to harvest tree (%d, %d)...", tile.x, tile.y)
+            GH_ENGINE.action_delay = 0.160
+            return
+        end
 
-        -- Punch tree
+        -- Punch tree within reach
         if type(requestTileChange) == "function" then
             requestTileChange(tile.x, tile.y, 18) -- Punch action
         end
@@ -1169,7 +1389,7 @@ local function on_tick_step(dt)
         GH_ENGINE.harvest_index = GH_ENGINE.harvest_index + 1
         GH_ENGINE.action_delay = calculate_placement_delay()
 
-    -- STATE 12: DESIGNATED DROPPING (5000 Safe Limit Multi-Tile Manager)
+    -- STATE 12: DESIGNATED DROPPING (Proximity Guard & Safe Two-Stage Drop)
     elseif state == STATE_12_DESIGNATED_DROPPING then
         local dz = GH_ENGINE.drop_zone
         local cur_w = get_current_world_name()
@@ -1185,12 +1405,16 @@ local function on_tick_step(dt)
             return
         end
 
-        -- Walk to designated drop coordinate
+        -- Walk to designated drop coordinate and check proximity
         safe_walk_to(dz.x, dz.y)
+        if not is_within_reach(dz.x, dz.y, 1) then
+            GH_ENGINE.status_message = string.format("Walking to drop tile (%d, %d)...", dz.x, dz.y)
+            GH_ENGINE.action_delay = 0.180
+            return
+        end
 
         -- Check 5000 item safe limit per tile
         if dz.count >= dz.limit then
-            -- Safe threshold reached! Advance to next tile to prevent overflow
             dz.x = dz.x + 1
             dz.count = 0
             GH_ENGINE.status_message = "Tile limit (5000) reached. Advanced drop coordinate to (" .. dz.x .. ", " .. dz.y .. ")."
@@ -1203,7 +1427,6 @@ local function on_tick_step(dt)
             local drop_amt = math.min(blocks_held, dz.limit - dz.count)
             safe_send_packet(2, "action|drop\n|itemID|" .. tostring(GH_ENGINE.target_block_id), now)
             safe_send_packet(2, "action|dialog_return\ndialog_name|drop_item\nitemID|" .. tostring(GH_ENGINE.target_block_id) .. "|\ncount|" .. tostring(drop_amt), now)
-
             dz.count = dz.count + drop_amt
             GH_ENGINE.anti_ban.last_drop_time = now
             GH_ENGINE.status_message = "Dropped " .. drop_amt .. " items at (" .. dz.x .. ", " .. dz.y .. ") [Total: " .. dz.count .. "/5000]."
@@ -1230,13 +1453,12 @@ local function on_tick_step(dt)
                 local next_name = (next_op and next_op.target_seed) or "Tree"
                 GH_ENGINE.status_message = string.format("Advancing to Step #%d / %d: %s",
                     GH_ENGINE.current_op_index, #GH_ENGINE.pipeline, next_name)
-                if type(doToast) == "function" then
-                    doToast(1, 5000, string.format("Advancing to Step #%d (%s)!", GH_ENGINE.current_op_index, next_name))
-                end
+                gh_announce_startup()
                 save_mass_state(now)
             else
                 GH_ENGINE.active_state = STATE_13_MISSION_COMPLETE
                 GH_ENGINE.status_message = "Mission completed successfully!"
+                gh_log("Gorev basariyla tamamlandi!")
                 save_mass_state(now)
             end
         end
@@ -1262,6 +1484,26 @@ local function render_imgui_hud()
     if type(ImGui) ~= "table" then return end
 
     ImGui.Begin("GEntaHAX Mass Tree Engine ##GH_MassHUD")
+
+    -- 0. Mission Progress Bar (Percentage Completed)
+    local prog = gh_calculate_mission_progress()
+    local step_idx = GH_ENGINE.current_op_index or 1
+    local total_steps = (type(GH_ENGINE.pipeline) == "table" and #GH_ENGINE.pipeline > 0 and #GH_ENGINE.pipeline) or 1
+    local act_op = (type(GH_ENGINE.pipeline) == "table" and GH_ENGINE.pipeline[step_idx])
+    local act_name = (act_op and act_op.target_seed) or GH_ENGINE.target_item_name or "Target Tree"
+
+    ImGui.TextUnformatted(string.format("Gorev: %%%.1f Tamamlandi | Adim %d/%d (%s)",
+        prog, step_idx, total_steps, act_name))
+
+    local filled = math.max(0, math.min(20, math.floor(prog / 5)))
+    local empty = 20 - filled
+    local bar_str = string.rep("#", filled) .. string.rep("-", empty)
+    ImGui.TextUnformatted(string.format("[%s] %%%.1f", bar_str, prog))
+
+    if type(ImGui.ProgressBar) == "function" then
+        ImGui.ProgressBar(prog / 100.0, nil, string.format("Gorev: %%%.1f", prog))
+    end
+    ImGui.Separator()
 
     -- 1. State & Status Badges
     local state_label = STATE_NAMES[GH_ENGINE.active_state] or "UNKNOWN"
@@ -1432,11 +1674,13 @@ local function render_imgui_hud()
             end
             GH_ENGINE.active_state = STATE_1_LOAD_PERSISTENCE
             GH_ENGINE.status_message = "Starting Mass Tree automation cycle..."
+            gh_announce_startup()
         end
     else
         if ImGui.Button("[ Pause / Stop ]") then
             GH_ENGINE.active_state = STATE_0_IDLE
             GH_ENGINE.status_message = "Automation paused by operator."
+            gh_log("Otomasyon duraklatildi (Operator tarafindan).")
         end
     end
 
@@ -1471,12 +1715,58 @@ local function on_render_hook(dt)
     -- Render HUD
     render_imgui_hud()
 
-    -- Cooperative periodic HTTP heartbeat to 127.0.0.1:8809 (ensures instant live status & zero disconnect)
+    -- Cooperative periodic HTTP heartbeat to 127.0.0.1:8809 (ensures instant live status & bi-directional web config)
     gh_http_heartbeat_timer = gh_http_heartbeat_timer + delta
     if gh_http_heartbeat_timer >= 1.2 then
         gh_http_heartbeat_timer = 0
         if type(makeRequest) == "function" then
-            makeRequest("http://127.0.0.1:8809/mass/heartbeat", "POST", {["Content-Type"] = "text/plain"}, gh_get_live_mass_state(), 800)
+            local res = makeRequest("http://127.0.0.1:8809/mass/heartbeat", "POST", {["Content-Type"] = "text/plain"}, gh_get_live_mass_state(), 800)
+            if (type(res) == "table" or type(res) == "userdata") and res.content and #res.content > 0 then
+                local data = json_decode(res.content)
+                if type(data) == "table" and type(data.config) == "table" then
+                    local cfg = data.config
+                    local changed = false
+                    if cfg.farm_world and cfg.farm_world ~= "" and cfg.farm_world ~= GH_ENGINE.farm_world then
+                        GH_ENGINE.farm_world = string.upper(cfg.farm_world)
+                        changed = true
+                    end
+                    if cfg.storage_world_a and cfg.storage_world_a ~= "" and cfg.storage_world_a ~= GH_ENGINE.storage_world_a then
+                        GH_ENGINE.storage_world_a = string.upper(cfg.storage_world_a)
+                        changed = true
+                    end
+                    if cfg.storage_world_b and cfg.storage_world_b ~= "" and cfg.storage_world_b ~= GH_ENGINE.storage_world_b then
+                        GH_ENGINE.storage_world_b = string.upper(cfg.storage_world_b)
+                        changed = true
+                    end
+                    if cfg.drop_world and cfg.drop_world ~= "" and cfg.drop_world ~= GH_ENGINE.drop_zone.world then
+                        GH_ENGINE.drop_zone.world = string.upper(cfg.drop_world)
+                        changed = true
+                    end
+                    if cfg.drop_x and tonumber(cfg.drop_x) and tonumber(cfg.drop_x) ~= GH_ENGINE.drop_zone.x then
+                        GH_ENGINE.drop_zone.x = tonumber(cfg.drop_x)
+                        changed = true
+                    end
+                    if cfg.drop_y and tonumber(cfg.drop_y) and tonumber(cfg.drop_y) ~= GH_ENGINE.drop_zone.y then
+                        GH_ENGINE.drop_zone.y = tonumber(cfg.drop_y)
+                        changed = true
+                    end
+                    if cfg.only_above_block ~= nil and cfg.only_above_block ~= GH_ENGINE.only_above_block then
+                        GH_ENGINE.only_above_block = (cfg.only_above_block == true)
+                        changed = true
+                    end
+                    if cfg.auto_advance ~= nil and cfg.auto_advance ~= GH_ENGINE.auto_advance_step then
+                        GH_ENGINE.auto_advance_step = (cfg.auto_advance == true)
+                        changed = true
+                    end
+                    if changed then
+                        gh_log("Web arayuzunden gelen yeni ayarlar senkronize edildi!")
+                        if type(doToast) == "function" then
+                            doToast(1, 3500, "Web ayarlari senkronize edildi!")
+                        end
+                        save_mass_state(GH_ENGINE.current_time)
+                    end
+                end
+            end
         end
     end
 
@@ -1513,6 +1803,7 @@ if type(AddHook) == "function" then
     -- Crash recovery: preload last saved config/progress into the HUD once at launch
     load_mass_state()
     GH_ENGINE.state_preloaded = true
+    gh_announce_startup()
     AddHook("OnRender", "GH_MassTreeEngine", on_render_hook)
     AddHook("OnVarlist", "GH_MassVarlist", on_varlist_handler)
     AddHook("OnRawPacket", "GH_MassRawPacket", on_raw_packet_handler)

@@ -355,6 +355,56 @@ class TestHTTPRelayBridge(unittest.TestCase):
         self.assertTrue(res.get("ok"))
         self.assertIn("capacity", res)
 
+    def test_route_mass_heartbeat_and_settings(self):
+        # 1. Update settings via POST /mass/settings
+        set_url = f"{self.base_url}/mass/settings"
+        set_payload = json.dumps({
+            "farm_world": "FARMBOT99",
+            "storage_world_a": "DEPODIRT",
+            "storage_world_b": "DEPOLAVA",
+            "drop_world": "DROPVAULT",
+            "drop_x": 42,
+            "drop_y": 18,
+            "only_above_block": True,
+            "auto_advance": True
+        }).encode("utf-8")
+        set_req = urllib.request.Request(set_url, data=set_payload, headers={"Content-Type": "application/json"})
+        set_resp = urllib.request.urlopen(set_req, timeout=5)
+        self.assertEqual(set_resp.status, 200)
+        set_data = json.loads(set_resp.read().decode("utf-8"))
+        self.assertTrue(set_data.get("ok"))
+        self.assertEqual(set_data["config"]["farm_world"], "FARMBOT99")
+
+        # 2. Game bot sends heartbeat POST /mass/heartbeat (includes PROG, STEP, LOG)
+        hb_url = f"{self.base_url}/mass/heartbeat"
+        hb_payload = (
+            "WORLD:FARMBOT99|ME:Berk|GEMS:12500|STATE:7|STATENAME:STATE_7: PLANTING_SEED_A|"
+            "CAP:300|PLANTED:120|REM:3600|READY:false|DROPW:DROPVAULT|DROPX:42|DROPY:18|DROPC:100|"
+            "INV:3:300,5:300|PROG:45.8|STEP:5|TOTSTEPS:16|ACTTREE:Aqua Block Seed|LOG:120/300 tohum ekildi"
+        ).encode("utf-8")
+        hb_req = urllib.request.Request(hb_url, data=hb_payload, headers={"Content-Type": "text/plain"})
+        hb_resp = urllib.request.urlopen(hb_req, timeout=5)
+        self.assertEqual(hb_resp.status, 200)
+        hb_data = json.loads(hb_resp.read().decode("utf-8"))
+        self.assertTrue(hb_data.get("ok"))
+        # Verify that pending config was returned to bot in heartbeat response
+        self.assertIn("config", hb_data)
+        self.assertEqual(hb_data["config"]["farm_world"], "FARMBOT99")
+
+        # 3. Web UI queries GET /mass/data to verify live state
+        data_url = f"{self.base_url}/mass/data"
+        data_resp = urllib.request.urlopen(data_url, timeout=5)
+        live = json.loads(data_resp.read().decode("utf-8"))
+        self.assertEqual(live["world"], "FARMBOT99")
+        self.assertEqual(live["player"], "Berk")
+        self.assertEqual(live["gems"], 12500)
+        self.assertAlmostEqual(live["mission_progress_percent"], 45.8)
+        self.assertEqual(live["current_step_num"], 5)
+        self.assertEqual(live["total_steps_count"], 16)
+        self.assertEqual(live["active_tree_name"], "Aqua Block Seed")
+        self.assertGreater(len(live["recent_logs"]), 0)
+        self.assertTrue(any("120/300" in line for line in live["recent_logs"]))
+
 
 class TestRemediatedAlgorithmicAccuracyAndHardening(unittest.TestCase):
     """Verifies remediated topological sort, single-visit MRP, bounded tree generation, and input hardening."""

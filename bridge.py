@@ -20,6 +20,7 @@ import subprocess
 import secrets
 import io
 import json
+import math
 import urllib.parse
 import urllib.request
 import re
@@ -79,9 +80,24 @@ def sanitize_bool(val: Any, default: bool = True) -> bool:
         s = val.strip().lower()
         if s in ("false", "0", "no", "f", "off", "none"):
             return False
-        if s in ("true", "1", "yes", "t", "on"):
-            return True
     return default
+
+
+def sanitize_float(val: Any, default: float = 0.0, min_val: Optional[float] = None, max_val: Optional[float] = None) -> float:
+    """Safely coerces float inputs with boundary clamping."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return default
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None and f < min_val:
+        f = min_val
+    if max_val is not None and f > max_val:
+        f = max_val
+    return f
 
 
 def parse_stock_payload(raw_stock: Any) -> Dict[int, int]:
@@ -147,8 +163,25 @@ _LIVE_MASS_STATE = {
     "planted_count": 0,
     "growth_remaining_seconds": 0,
     "is_ready_to_harvest": False,
-    "drop_zone": {"world": "", "x": 0, "y": 0, "count": 0, "limit": 5000}
+    "drop_zone": {"world": "", "x": 50, "y": 23, "count": 0, "limit": 5000},
+    "mission_progress_percent": 0.0,
+    "current_step_num": 1,
+    "total_steps_count": 1,
+    "active_tree_name": "Chandelier Tree",
+    "config": {
+        "farm_world": "",
+        "storage_world": "",
+        "drop_world": "",
+        "drop_x": 50,
+        "drop_y": 23,
+        "only_above_block": True,
+        "auto_advance": True
+    },
+    "recent_logs": []
 }
+
+_LIVE_LOGS = []
+_PENDING_CONFIG_UPDATE = None
 
 _LAST_SYNC_TIME = 0.0
 _LAST_FAILURE_TIME = 0.0
@@ -642,6 +675,7 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.end_headers()
 
             def do_POST(self):
+                global _PENDING_CONFIG_UPDATE
                 d = self._active_dir()
                 parsed = urllib.parse.urlparse(self.path)
                 clean_path = parsed.path
@@ -680,6 +714,12 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                         rem_val = sanitize_int(fields.get("REM", 0), default=0, min_val=0)
                         ready_val = sanitize_bool(fields.get("READY", False))
 
+                        prog_val = sanitize_float(fields.get("PROG", 0.0), default=0.0, min_val=0.0, max_val=100.0)
+                        step_val = sanitize_int(fields.get("STEP", 1), default=1, min_val=1)
+                        tot_val = sanitize_int(fields.get("TOTSTEPS", 1), default=1, min_val=1)
+                        act_tree = fields.get("ACTTREE", "").strip() or "Target Tree"
+                        log_msg = fields.get("LOG", "").strip()
+
                         with _STATE_LOCK:
                             _LIVE_MASS_STATE["bridge_connected"] = True
                             _LIVE_MASS_STATE["last_heartbeat"] = time.time()
@@ -687,6 +727,10 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                             _LIVE_MASS_STATE["player"] = p_name if (p_name and p_name != "?") else "Unknown"
                             _LIVE_MASS_STATE["gems"] = gems_val
                             _LIVE_MASS_STATE["bot_phase"] = st_name
+                            _LIVE_MASS_STATE["mission_progress_percent"] = prog_val
+                            _LIVE_MASS_STATE["current_step_num"] = step_val
+                            _LIVE_MASS_STATE["total_steps_count"] = tot_val
+                            _LIVE_MASS_STATE["active_tree_name"] = act_tree
                             if cap_val > 0:
                                 _LIVE_MASS_STATE["scanned_capacity"] = cap_val
                             _LIVE_MASS_STATE["planted_count"] = planted_val
@@ -710,13 +754,82 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                                             inv_dict[sid] = cnt
                             _LIVE_MASS_STATE["inventory"] = inv_dict
 
-                    resp_bytes = b'{"ok": true}'
+                            if log_msg:
+                                ts = time.strftime("[%H:%M:%S] ")
+                                formatted_log = f"{ts}{log_msg}"
+                                if not _LIVE_LOGS or _LIVE_LOGS[-1] != formatted_log:
+                                    _LIVE_LOGS.append(formatted_log)
+                                    if len(_LIVE_LOGS) > 100:
+                                        _LIVE_LOGS.pop(0)
+                            _LIVE_MASS_STATE["recent_logs"] = list(_LIVE_LOGS[-35:])
+                    resp_obj = {"ok": True}
+                    with _STATE_LOCK:
+                        if _PENDING_CONFIG_UPDATE:
+                            resp_obj["config"] = dict(_PENDING_CONFIG_UPDATE)
+                            _PENDING_CONFIG_UPDATE = None
+
+                    resp_bytes = json.dumps(resp_obj, ensure_ascii=False).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Access-Control-Allow-Origin", "*")
                     self.send_header("Content-Length", str(len(resp_bytes)))
                     self.end_headers()
                     self.wfile.write(resp_bytes)
+                elif clean_path == "/mass/settings":
+                    length = sanitize_int(self.headers.get("Content-Length", "0"), default=0, min_val=0, max_val=1_048_576)
+                    raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""
+                    try:
+                        cfg_payload = json.loads(raw) if raw.strip() else {}
+                        if not isinstance(cfg_payload, dict):
+                            raise ValueError("Settings payload must be a JSON object.")
+
+                        with _STATE_LOCK:
+                            for key in ("farm_world", "storage_world_a", "storage_world_b", "drop_world"):
+                                if key in cfg_payload:
+                                    val = str(cfg_payload[key]).strip().upper()
+                                    _LIVE_MASS_STATE["config"][key] = val
+                            if "storage_world" in cfg_payload and "storage_world_a" not in cfg_payload:
+                                _LIVE_MASS_STATE["config"]["storage_world_a"] = str(cfg_payload["storage_world"]).strip().upper()
+
+                            if "drop_world" in cfg_payload and cfg_payload["drop_world"]:
+                                _LIVE_MASS_STATE["drop_zone"]["world"] = str(cfg_payload["drop_world"]).strip().upper()
+
+                            if "drop_x" in cfg_payload:
+                                dx = sanitize_int(cfg_payload["drop_x"], default=50, min_val=0, max_val=99)
+                                _LIVE_MASS_STATE["config"]["drop_x"] = dx
+                                _LIVE_MASS_STATE["drop_zone"]["x"] = dx
+
+                            if "drop_y" in cfg_payload:
+                                dy = sanitize_int(cfg_payload["drop_y"], default=23, min_val=0, max_val=59)
+                                _LIVE_MASS_STATE["config"]["drop_y"] = dy
+                                _LIVE_MASS_STATE["drop_zone"]["y"] = dy
+
+                            if "only_above_block" in cfg_payload:
+                                _LIVE_MASS_STATE["config"]["only_above_block"] = sanitize_bool(cfg_payload["only_above_block"])
+
+                            if "auto_advance" in cfg_payload:
+                                _LIVE_MASS_STATE["config"]["auto_advance"] = sanitize_bool(cfg_payload["auto_advance"])
+
+                            _PENDING_CONFIG_UPDATE = dict(_LIVE_MASS_STATE["config"])
+
+                            ts = time.strftime("[%H:%M:%S] ")
+                            log_entry = f"{ts}[WEB] Ayarlar kaydedildi: Farm={_LIVE_MASS_STATE['config'].get('farm_world','')}, Drop={_LIVE_MASS_STATE['config'].get('drop_world','')}"
+                            _LIVE_LOGS.append(log_entry)
+                            if len(_LIVE_LOGS) > 100:
+                                _LIVE_LOGS.pop(0)
+                            _LIVE_MASS_STATE["recent_logs"] = list(_LIVE_LOGS[-35:])
+
+                        resp_data = {"ok": True, "config": _LIVE_MASS_STATE["config"]}
+                    except Exception as e:
+                        resp_data = {"ok": False, "error": str(e)}
+
+                    data = json.dumps(resp_data, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
                 elif clean_path == "/mass/action":
                     length = sanitize_int(self.headers.get("Content-Length", "0"), default=0, min_val=0, max_val=1_048_576)
                     raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""

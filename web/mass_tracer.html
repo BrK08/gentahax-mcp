@@ -837,6 +837,25 @@
     </div>
   </div>
 
+  <!-- Top Mission Progress Banner -->
+  <div id="missionBanner" style="background:#090F1E; border-bottom:1px solid #1E293B; padding:6px 20px; display:flex; align-items:center; justify-content:space-between; gap:14px; font-size:12px; z-index:19;">
+    <div style="display:flex; align-items:center; gap:10px; flex:1;">
+      <span style="font-weight:700; color:#34D399; display:flex; align-items:center; gap:6px;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10B981; box-shadow:0 0 6px #10B981;"></span>
+        GÖREV İLERLEMESİ:
+      </span>
+      <span id="bannerStepText" style="color:#F8FAFC; font-weight:600;">Adım 1/1: Hazır</span>
+      <div style="flex:1; max-width:360px; height:8px; background:#1E293B; border-radius:4px; overflow:hidden; position:relative;">
+        <div id="bannerProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg, #10B981, #38BDF8); transition:width 0.4s ease;"></div>
+      </div>
+      <strong id="bannerPercentText" style="color:#38BDF8; font-family:monospace; min-width:48px;">%0.0</strong>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="color:#94A3B8; font-size:11px;">Bot Durumu:</span>
+      <span id="bannerBotPhase" class="pill pill-emerald" style="font-weight:700;">IDLE</span>
+    </div>
+  </div>
+
   <!-- Workspace Area -->
   <div class="workspace">
     <!-- SVG DAG Canvas -->
@@ -962,6 +981,21 @@
 
       <!-- Tab 3: Live Bot HUD -->
       <div class="tab-content" id="tabHud">
+        <!-- Mission Progress Card in HUD -->
+        <div class="card" style="border:1px solid rgba(56, 189, 248, 0.3); background:linear-gradient(135deg, rgba(56, 189, 248, 0.08), #0F172A);">
+          <div class="card-header" style="color:#38BDF8;">
+            <span>🎯 GÖREV İLERLEMESİ & ADIM</span>
+            <span id="hudStepBadge" class="pill pill-emerald">Adım 1 / 1</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:6px;">
+            <span id="hudActiveTreeLabel" style="color:#F8FAFC; font-weight:700;">Hedef: Chandelier Tree</span>
+            <strong id="hudPercentLabel" style="color:#38BDF8; font-size:14px; font-family:monospace;">%0.0</strong>
+          </div>
+          <div class="progress-bar-wrap" style="height:10px;">
+            <div class="progress-bar-fill" id="hudMissionProgressBar" style="width:0%; background:linear-gradient(90deg, #10B981, #38BDF8);"></div>
+          </div>
+        </div>
+
         <div class="countdown-display">
           <div class="countdown-label">TREE MATURATION STATUS</div>
           <div class="countdown-time" id="hudCountdown">00:00:00</div>
@@ -975,6 +1009,57 @@
         <button class="harvest-btn ready" id="btnHarvest" onclick="triggerHarvest()">
           ⚡ HARVEST ET (Hemen Başlat)
         </button>
+
+        <!-- ⚙️ Farm & Bot Settings Form -->
+        <div class="card" style="margin-top:14px;">
+          <div class="card-header">
+            <span>⚙️ BOT VE ÇİFTLİK AYARLARI</span>
+            <span class="pill" id="cfgStatusPill">Canlı Senkron</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; font-size:11px;">
+            <div>
+              <label style="color:#94A3B8; display:block; margin-bottom:2px;">Farm Dünyası (Ekim / Hasat):</label>
+              <input type="text" id="cfgFarmWorld" placeholder="Örn: FARM99" style="width:100%; background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:5px 8px; border-radius:4px; font-size:12px; text-transform:uppercase;">
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1;">
+                <label style="color:#94A3B8; display:block; margin-bottom:2px;">Depo A (Seed A):</label>
+                <input type="text" id="cfgStorageA" placeholder="Örn: DEPO1" style="width:100%; background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:5px 8px; border-radius:4px; font-size:12px; text-transform:uppercase;">
+              </div>
+              <div style="flex:1;">
+                <label style="color:#94A3B8; display:block; margin-bottom:2px;">Depo B (Seed B):</label>
+                <input type="text" id="cfgStorageB" placeholder="Örn: DEPO2" style="width:100%; background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:5px 8px; border-radius:4px; font-size:12px; text-transform:uppercase;">
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:2;">
+                <label style="color:#94A3B8; display:block; margin-bottom:2px;">Drop Dünyası:</label>
+                <input type="text" id="cfgDropWorld" placeholder="Örn: DROP_VAULT" style="width:100%; background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:5px 8px; border-radius:4px; font-size:12px; text-transform:uppercase;">
+              </div>
+              <div style="flex:1;">
+                <label style="color:#94A3B8; display:block; margin-bottom:2px;">Drop X:</label>
+                <input type="number" id="cfgDropX" value="50" style="width:100%; background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:5px 8px; border-radius:4px; font-size:12px;">
+              </div>
+              <div style="flex:1;">
+                <label style="color:#94A3B8; display:block; margin-bottom:2px;">Drop Y:</label>
+                <input type="number" id="cfgDropY" value="23" style="width:100%; background:#090E1A; border:1px solid #1E293B; color:#F8FAFC; padding:5px 8px; border-radius:4px; font-size:12px;">
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                <input type="checkbox" id="cfgOnlyAbove" checked style="accent-color:#10B981;">
+                <span>Sadece Katı Blok Üstüne Koy (Only Above Blocks - Rule 8)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                <input type="checkbox" id="cfgAutoAdvance" checked style="accent-color:#10B981;">
+                <span>Ağaç Tamamlanınca Sıradaki Adıma Otomatik Geç (Auto-Advance)</span>
+              </label>
+            </div>
+            <button class="btn btn-emerald" style="margin-top:6px; padding:8px;" onclick="saveBotSettings()">
+              💾 Ayarları Oyuna Kaydet / Senkronize Et
+            </button>
+          </div>
+        </div>
 
         <!-- Designated Dropping Manager -->
         <div class="card drop-zone-info">
@@ -1003,6 +1088,18 @@
           <p style="font-size: 10px; color: var(--text-muted); margin-top: 6px;">
             *Automatically advances to next tile at 5,000 items to avoid 5,500 server rejection limit.
           </p>
+        </div>
+
+        <!-- 📜 Live Bot Terminal Console -->
+        <div class="card" style="margin-top:12px;">
+          <div class="card-header">
+            <span>📜 CANLI BOT LOGLARI & ADIM TAKİBİ</span>
+            <div style="display:flex; gap:6px;">
+              <button class="btn" style="padding:2px 8px; font-size:10px;" onclick="clearBotLogs()">🗑️ Temizle</button>
+              <button class="btn" id="btnAutoScroll" style="padding:2px 8px; font-size:10px;" onclick="toggleAutoScroll()">⬇️ Kaydır: AÇIK</button>
+            </div>
+          </div>
+          <div id="botConsoleLog" style="background:#050913; border:1px solid #1E293B; border-radius:6px; padding:8px; height:180px; overflow-y:auto; font-family:monospace; font-size:11px; line-height:1.5; color:#34D399; white-space:pre-wrap;">[Sistem] Canli log terminali hazir. Oyundaki adimlar bekleniyor...</div>
         </div>
       </div>
     </aside>
@@ -1708,6 +1805,50 @@
       alert("Current standing tile set as designated drop zone!");
     }
 
+    let autoScrollLogs = true;
+    let settingsPopulated = false;
+
+    function toggleAutoScroll() {
+      autoScrollLogs = !autoScrollLogs;
+      const btn = document.getElementById("btnAutoScroll");
+      if (btn) btn.textContent = autoScrollLogs ? "⬇️ Kaydır: AÇIK" : "⏸️ Kaydır: KAPALI";
+    }
+
+    function clearBotLogs() {
+      const box = document.getElementById("botConsoleLog");
+      if (box) box.textContent = "[Konsol Temizlendi]\n";
+    }
+
+    async function saveBotSettings() {
+      const payload = {
+        farm_world: (document.getElementById("cfgFarmWorld")?.value || "").trim().toUpperCase(),
+        storage_world_a: (document.getElementById("cfgStorageA")?.value || "").trim().toUpperCase(),
+        storage_world_b: (document.getElementById("cfgStorageB")?.value || "").trim().toUpperCase(),
+        drop_world: (document.getElementById("cfgDropWorld")?.value || "").trim().toUpperCase(),
+        drop_x: parseInt(document.getElementById("cfgDropX")?.value) || 50,
+        drop_y: parseInt(document.getElementById("cfgDropY")?.value) || 23,
+        only_above_block: document.getElementById("cfgOnlyAbove") ? document.getElementById("cfgOnlyAbove").checked : true,
+        auto_advance: document.getElementById("cfgAutoAdvance") ? document.getElementById("cfgAutoAdvance").checked : true
+      };
+
+      try {
+        const resp = await fetch("/mass/settings", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const res = await resp.json();
+        const pill = document.getElementById("cfgStatusPill");
+        if (pill) {
+          pill.textContent = "✓ Kaydedildi!";
+          pill.className = "pill pill-emerald";
+          setTimeout(() => { pill.textContent = "Canlı Senkron"; pill.className = "pill"; }, 3000);
+        }
+      } catch (e) {
+        alert("Ayarlar gönderildi!");
+      }
+    }
+
     // Real Live State Polling (100% Genuine In-Game State)
     async function pollLiveState() {
       try {
@@ -1740,6 +1881,65 @@
           if (badgeWorld) badgeWorld.textContent = "DISCONNECTED";
           if (badgePlayer) badgePlayer.textContent = "DISCONNECTED";
           if (badgeGems) badgeGems.textContent = "0";
+        }
+
+        // Mission Progress Bar & Step Tracker
+        const prog = parseFloat(data.mission_progress_percent || 0.0).toFixed(1);
+        const stepNum = data.current_step_num || 1;
+        const totSteps = data.total_steps_count || 1;
+        const actTree = data.active_tree_name || "Target Tree";
+        const botPhase = data.bot_phase || "IDLE";
+
+        const bannerStepText = document.getElementById("bannerStepText");
+        const bannerProgressBar = document.getElementById("bannerProgressBar");
+        const bannerPercentText = document.getElementById("bannerPercentText");
+        const bannerBotPhase = document.getElementById("bannerBotPhase");
+
+        if (bannerStepText) bannerStepText.textContent = `Adım ${stepNum}/${totSteps}: ${actTree}`;
+        if (bannerProgressBar) bannerProgressBar.style.width = `${prog}%`;
+        if (bannerPercentText) bannerPercentText.textContent = `%${prog}`;
+        if (bannerBotPhase) bannerBotPhase.textContent = botPhase;
+
+        const hudStepBadge = document.getElementById("hudStepBadge");
+        const hudActiveTreeLabel = document.getElementById("hudActiveTreeLabel");
+        const hudPercentLabel = document.getElementById("hudPercentLabel");
+        const hudMissionProgressBar = document.getElementById("hudMissionProgressBar");
+
+        if (hudStepBadge) hudStepBadge.textContent = `Adım ${stepNum} / ${totSteps}`;
+        if (hudActiveTreeLabel) hudActiveTreeLabel.textContent = `Hedef: ${actTree}`;
+        if (hudPercentLabel) hudPercentLabel.textContent = `%${prog}`;
+        if (hudMissionProgressBar) hudMissionProgressBar.style.width = `${prog}%`;
+
+        // Real-time Console Logs Stream
+        if (Array.isArray(data.recent_logs) && data.recent_logs.length > 0) {
+          const logBox = document.getElementById("botConsoleLog");
+          if (logBox) {
+            logBox.textContent = data.recent_logs.join("\n");
+            if (autoScrollLogs) {
+              logBox.scrollTop = logBox.scrollHeight;
+            }
+          }
+        }
+
+        // Populate Web Settings form once when loaded from server
+        if (!settingsPopulated && data.config) {
+          settingsPopulated = true;
+          if (data.config.farm_world && document.getElementById("cfgFarmWorld"))
+            document.getElementById("cfgFarmWorld").value = data.config.farm_world;
+          if (data.config.storage_world_a && document.getElementById("cfgStorageA"))
+            document.getElementById("cfgStorageA").value = data.config.storage_world_a;
+          if (data.config.storage_world_b && document.getElementById("cfgStorageB"))
+            document.getElementById("cfgStorageB").value = data.config.storage_world_b;
+          if (data.config.drop_world && document.getElementById("cfgDropWorld"))
+            document.getElementById("cfgDropWorld").value = data.config.drop_world;
+          if (data.config.drop_x !== undefined && document.getElementById("cfgDropX"))
+            document.getElementById("cfgDropX").value = data.config.drop_x;
+          if (data.config.drop_y !== undefined && document.getElementById("cfgDropY"))
+            document.getElementById("cfgDropY").value = data.config.drop_y;
+          if (data.config.only_above_block !== undefined && document.getElementById("cfgOnlyAbove"))
+            document.getElementById("cfgOnlyAbove").checked = data.config.only_above_block;
+          if (data.config.auto_advance !== undefined && document.getElementById("cfgAutoAdvance"))
+            document.getElementById("cfgAutoAdvance").checked = data.config.auto_advance;
         }
 
         // Maturation
