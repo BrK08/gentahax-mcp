@@ -160,6 +160,13 @@ def sync_live_game_state(force: bool = False) -> Dict[str, Any]:
     global _LAST_SYNC_TIME, _LAST_FAILURE_TIME
     now = time.time()
 
+    # 1. Direct HTTP Heartbeat priority: if game pushed state via HTTP within last 4s, it is live
+    with _STATE_LOCK:
+        last_hb = _LIVE_MASS_STATE.get("last_heartbeat", 0.0)
+        if (now - last_hb) < 4.0:
+            _LIVE_MASS_STATE["bridge_connected"] = True
+            return dict(_LIVE_MASS_STATE)
+
     # Backoff if bridge recently timed out or is offline (prevents blocking HTTP requests)
     if not force and (now - _LAST_FAILURE_TIME) < 5.0:
         with _STATE_LOCK:
@@ -654,6 +661,62 @@ def start_http_relay(port: int = RELAY_PORT) -> bool:
                     self.send_header("Content-Length", "2")
                     self.end_headers()
                     self.wfile.write(b"OK")
+                elif clean_path == "/mass/heartbeat":
+                    length = sanitize_int(self.headers.get("Content-Length", "0"), default=0, min_val=0, max_val=1_048_576)
+                    raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""
+                    if raw and "WORLD:" in raw:
+                        fields = {}
+                        for part in raw.split("|"):
+                            if ":" in part:
+                                k, v = part.split(":", 1)
+                                fields[k.strip()] = v.strip()
+
+                        w_name = fields.get("WORLD", "").strip()
+                        p_name = fields.get("ME", "").strip()
+                        gems_val = sanitize_int(fields.get("GEMS", 0), default=0, min_val=0)
+                        st_name = fields.get("STATENAME", "IDLE")
+                        cap_val = sanitize_int(fields.get("CAP", 0), default=0, min_val=0)
+                        planted_val = sanitize_int(fields.get("PLANTED", 0), default=0, min_val=0)
+                        rem_val = sanitize_int(fields.get("REM", 0), default=0, min_val=0)
+                        ready_val = sanitize_bool(fields.get("READY", False))
+
+                        with _STATE_LOCK:
+                            _LIVE_MASS_STATE["bridge_connected"] = True
+                            _LIVE_MASS_STATE["last_heartbeat"] = time.time()
+                            _LIVE_MASS_STATE["world"] = w_name if (w_name and "Dunya yok" not in w_name) else "MENU (No World)"
+                            _LIVE_MASS_STATE["player"] = p_name if (p_name and p_name != "?") else "Unknown"
+                            _LIVE_MASS_STATE["gems"] = gems_val
+                            _LIVE_MASS_STATE["bot_phase"] = st_name
+                            if cap_val > 0:
+                                _LIVE_MASS_STATE["scanned_capacity"] = cap_val
+                            _LIVE_MASS_STATE["planted_count"] = planted_val
+                            _LIVE_MASS_STATE["growth_remaining_seconds"] = rem_val
+                            _LIVE_MASS_STATE["is_ready_to_harvest"] = ready_val
+
+                            if fields.get("DROPW"):
+                                _LIVE_MASS_STATE["drop_zone"]["world"] = fields["DROPW"]
+                                _LIVE_MASS_STATE["drop_zone"]["x"] = sanitize_int(fields.get("DROPX", 0), default=0)
+                                _LIVE_MASS_STATE["drop_zone"]["y"] = sanitize_int(fields.get("DROPY", 0), default=0)
+                                _LIVE_MASS_STATE["drop_zone"]["count"] = sanitize_int(fields.get("DROPC", 0), default=0)
+
+                            inv_dict = {}
+                            if fields.get("INV"):
+                                for tok in fields["INV"].split(","):
+                                    if ":" in tok:
+                                        k, v = tok.split(":", 1)
+                                        sid = sanitize_int(k, 0)
+                                        cnt = sanitize_int(v, 0)
+                                        if sid > 0 and cnt > 0:
+                                            inv_dict[sid] = cnt
+                            _LIVE_MASS_STATE["inventory"] = inv_dict
+
+                    resp_bytes = b'{"ok": true}'
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(resp_bytes)))
+                    self.end_headers()
+                    self.wfile.write(resp_bytes)
                 elif clean_path == "/mass/action":
                     length = sanitize_int(self.headers.get("Content-Length", "0"), default=0, min_val=0, max_val=1_048_576)
                     raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""

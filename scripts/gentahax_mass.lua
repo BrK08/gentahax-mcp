@@ -137,8 +137,26 @@ function gh_get_live_mass_state()
     local drop_x = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.x) or 0
     local drop_y = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.y) or 0
     local drop_c = (GH_ENGINE.drop_zone and GH_ENGINE.drop_zone.count) or 0
-    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d",
-        world_name, player_name, gems, state, state_name, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c)
+
+    local inv_tokens = {}
+    if type(getInventory) == "function" or type(GetInventory) == "function" then
+        local inv = (type(getInventory) == "function" and getInventory()) or GetInventory() or {}
+        if type(inv) == "table" or type(inv) == "userdata" then
+            for _, itm in pairs(inv) do
+                if (type(itm) == "table" or type(itm) == "userdata") and (itm.id or itm.itemID) then
+                    local id = itm.id or itm.itemID
+                    local count = tonumber(itm.count) or tonumber(itm.amount) or 0
+                    if id and count > 0 then
+                        inv_tokens[#inv_tokens + 1] = tostring(id) .. ":" .. tostring(count)
+                    end
+                end
+            end
+        end
+    end
+    local inv_str = table.concat(inv_tokens, ",")
+
+    return string.format("WORLD:%s|ME:%s|GEMS:%d|STATE:%d|STATENAME:%s|CAP:%d|PLANTED:%d|REM:%d|READY:%s|DROPW:%s|DROPX:%d|DROPY:%d|DROPC:%d|INV:%s",
+        world_name, player_name, gems, state, state_name, cap, planted, rem, tostring(ready), drop_w, drop_x, drop_y, drop_c, inv_str)
 end
 
 -- ------------------------------------------------------------------------------
@@ -1444,12 +1462,23 @@ end
 -- 9. MAIN ONRENDER HOOK ENTRY POINT (DELTA-TIME TICK ACCUMULATION)
 -- ------------------------------------------------------------------------------
 
+local gh_http_heartbeat_timer = 0
+
 local function on_render_hook(dt)
     local delta = tonumber(dt) or 0.016
     if delta <= 0 or delta > 0.5 then delta = 0.016 end
 
     -- Render HUD
     render_imgui_hud()
+
+    -- Cooperative periodic HTTP heartbeat to 127.0.0.1:8809 (ensures instant live status & zero disconnect)
+    gh_http_heartbeat_timer = gh_http_heartbeat_timer + delta
+    if gh_http_heartbeat_timer >= 1.2 then
+        gh_http_heartbeat_timer = 0
+        if type(makeRequest) == "function" then
+            makeRequest("http://127.0.0.1:8809/mass/heartbeat", "POST", {["Content-Type"] = "text/plain"}, gh_get_live_mass_state(), 800)
+        end
+    end
 
     -- Cooperative periodic logic execution
     GH_ENGINE.tick_timer = GH_ENGINE.tick_timer + delta

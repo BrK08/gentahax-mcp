@@ -336,42 +336,90 @@
       to { stroke-dashoffset: 0; }
     }
 
-    .dag-edge-active {
-      fill: none;
-      stroke: #10B981;
-      stroke-width: 3px;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-dasharray: 10 5;
-      animation: dashFlowDirection 1.5s linear infinite, emeraldPulseGlow 2.4s ease-in-out infinite;
-      marker-end: url(#arrow-active);
-    }
-
-    .dag-edge-inactive {
+    .dag-edge {
       fill: none;
       stroke: #334155;
       stroke-width: 1.5px;
       stroke-linecap: round;
       stroke-linejoin: round;
-      opacity: 0.40;
-      stroke-dasharray: 4 4;
-      marker-end: url(#arrow-inactive);
-      transition: stroke 0.3s ease, opacity 0.3s ease;
+      opacity: 0.35;
+      transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
     }
 
-    .dag-edge-inactive:hover {
-      stroke: #64748B;
-      opacity: 0.8;
-      cursor: pointer;
+    .dag-edge-active {
+      fill: none;
+      stroke: #059669;
+      stroke-width: 2px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.60;
+      marker-end: url(#arrow-active);
+      transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+    }
+
+    .dag-edge-inactive {
+      fill: none;
+      stroke: #1E293B;
+      stroke-width: 1.2px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.20;
+      transition: stroke 0.2s ease, opacity 0.2s ease;
+    }
+
+    /* Interactive Subgraph Highlighting (Clean & Focused on Hover) */
+    .dag-edge.highlighted {
+      stroke: #10B981 !important;
+      stroke-width: 3.5px !important;
+      opacity: 1.0 !important;
+      filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.9));
+      marker-end: url(#arrow-active) !important;
+      stroke-dasharray: 8 4;
+      animation: dashFlowDirection 1.2s linear infinite;
+    }
+
+    .dag-edge.dimmed {
+      opacity: 0.05 !important;
     }
 
     .dag-node {
       cursor: pointer;
-      transition: transform 0.15s ease;
+      transition: opacity 0.2s ease;
     }
 
-    .dag-node:hover {
-      transform: scale(1.02);
+    /* Fixed: No transform scale to prevent SVG node jumping across canvas */
+    .dag-node:hover > rect:first-child {
+      stroke: #34D399 !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.7));
+    }
+
+    .dag-node.highlighted > rect:first-child {
+      stroke: #F59E0B !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.8));
+    }
+
+    .dag-node.dimmed {
+      opacity: 0.20 !important;
+    }
+
+    /* Floating Tooltip */
+    #hoverTooltip {
+      position: absolute;
+      pointer-events: none;
+      background: #0B132B;
+      border: 1px solid #10B981;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: #F8FAFC;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+      display: none;
+      z-index: 1000;
+      max-width: 300px;
+      line-height: 1.5;
+      backdrop-filter: blur(6px);
     }
 
     /* Canvas Controls */
@@ -766,6 +814,16 @@
       📡 Scan Farm World
     </button>
 
+    <!-- View Mode Selector (Sade vs Tüm Bağlantılar) -->
+    <div style="display:flex; align-items:center; gap:6px; margin-left:6px;">
+      <button class="btn btn-emerald" id="btnModeClean" onclick="setViewMode('clean')" title="Sade ve ferah görünüm (hover odaklı)">
+        🌿 Sade (Ferah)
+      </button>
+      <button class="btn" id="btnModeAll" onclick="setViewMode('all')" title="Tüm bağlantıları aynı anda göster">
+        🕸️ Tüm Ağ
+      </button>
+    </div>
+
     <!-- Toggles (Satisfying AGENTS.md Rule 8) -->
     <div class="toggles">
       <label title="Only plant on empty air tiles that have a solid floor underneath (y+1 solid, y empty)">
@@ -783,6 +841,8 @@
   <div class="workspace">
     <!-- SVG DAG Canvas -->
     <div class="canvas-container" id="canvasContainer">
+      <!-- Floating Interactive Tooltip -->
+      <div id="hoverTooltip"></div>
       <svg id="dagCanvas" viewBox="0 0 1600 1000">
         <defs>
           <!-- Emerald Glow Filter -->
@@ -1049,6 +1109,43 @@
       updateTransform();
     }
 
+    let currentViewMode = "clean"; // "clean" (focus mode) or "all" (full web)
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      const bClean = document.getElementById("btnModeClean");
+      const bAll = document.getElementById("btnModeAll");
+      if (bClean && bAll) {
+        if (mode === "clean") {
+          bClean.className = "btn btn-emerald";
+          bAll.className = "btn";
+        } else {
+          bClean.className = "btn";
+          bAll.className = "btn btn-emerald";
+        }
+      }
+      if (traceData) {
+        renderDAG(traceData);
+      }
+    }
+
+    function highlightRoadmapStep(itemName) {
+      switchTab('roadmap');
+      const items = document.querySelectorAll('.operation-item');
+      items.forEach(it => {
+        if (it.textContent.toLowerCase().includes(itemName.toLowerCase())) {
+          it.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          it.style.transition = 'all 0.3s ease';
+          it.style.background = 'rgba(16, 185, 129, 0.25)';
+          it.style.borderLeft = '4px solid #10B981';
+          setTimeout(() => {
+            it.style.background = '';
+            it.style.borderLeft = '';
+          }, 2500);
+        }
+      });
+    }
+
     function renderDAG(data) {
       const nodesLayer = document.getElementById("nodesLayer");
       const edgesLayer = document.getElementById("edgesLayer");
@@ -1102,6 +1199,11 @@
         });
       });
 
+      // Track edge and node elements for smart hover subgraph highlighting
+      const edgeElements = [];
+      const nodeElements = {};
+      const tooltip = document.getElementById("hoverTooltip");
+
       // Render Edges
       edges.forEach(e => {
         const src = nodePositions[e.source];
@@ -1118,8 +1220,9 @@
         const dy = (y1 - y2) / 2;
         const d = `M ${x1} ${y1} C ${x1} ${y1 - dy}, ${x2} ${y2 + dy}, ${x2} ${y2}`;
         pathEl.setAttribute("d", d);
-        pathEl.setAttribute("class", e.is_active ? "dag-edge-active" : "dag-edge-inactive");
+        pathEl.setAttribute("class", (currentViewMode === "all") ? "dag-edge-active" : "dag-edge");
         edgesLayer.appendChild(pathEl);
+        edgeElements.push({ el: pathEl, source: e.source, target: e.target });
       });
 
       const firstActiveTarget = (data.summary && data.summary.first_active_target) || "";
@@ -1135,13 +1238,92 @@
 
         const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
         g.setAttribute("class", "dag-node");
+        g.setAttribute("id", "node_" + n.id);
         g.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
         if (isPruned) {
           g.setAttribute("opacity", "0.55");
         }
+        nodeElements[n.id] = g;
+
+        // Interactive Smart Hover: Highlights ONLY connected subgraph, dims everything else, shows recipe tooltip
+        g.addEventListener("mouseenter", () => {
+          const connectedNodeIds = new Set([n.id]);
+
+          edgeElements.forEach(item => {
+            if (item.target === n.id || item.source === n.id) {
+              item.el.classList.add("highlighted");
+              item.el.classList.remove("dimmed");
+              connectedNodeIds.add(item.source);
+              connectedNodeIds.add(item.target);
+            } else {
+              item.el.classList.add("dimmed");
+              item.el.classList.remove("highlighted");
+            }
+          });
+
+          Object.keys(nodeElements).forEach(idStr => {
+            const numId = parseInt(idStr);
+            if (connectedNodeIds.has(numId)) {
+              nodeElements[idStr].classList.remove("dimmed");
+              if (numId !== n.id) {
+                nodeElements[idStr].classList.add("highlighted");
+              }
+            } else {
+              nodeElements[idStr].classList.add("dimmed");
+              nodeElements[idStr].classList.remove("highlighted");
+            }
+          });
+
+          if (tooltip) {
+            let recipeInfo = "🌱 <em>Temel Tohum (Aşılama gerekmez)</em>";
+            if (n.ingredients && n.ingredients.length === 2) {
+              recipeInfo = `🌱 <strong>Aşı:</strong> <span style="color:#6EE7B7;">${n.ingredients[0].seed_name}</span> + <span style="color:#6EE7B7;">${n.ingredients[1].seed_name}</span>`;
+            }
+            tooltip.innerHTML = `
+              <div style="font-weight:800; font-size:12px; color:#FCD34D; margin-bottom:4px;">
+                ${n.item_name} (Seed ID: ${n.seed_id})
+              </div>
+              <div style="color:#A7F3D0; font-size:10px; margin-bottom:4px;">
+                Tier ${n.tier} | ⏱️ Büyüme: ${n.growth_time_formatted}
+              </div>
+              <div style="font-size:11px; color:#E2E8F0; margin-bottom:6px; padding:4px 6px; background:#1E293B; border-radius:4px;">
+                ${recipeInfo}
+              </div>
+              <div style="font-size:10px; color:#38BDF8; display:flex; justify-content:space-between;">
+                <span>Gereken: <strong>x${demand.gross_required || currentCapacity}</strong></span>
+                <span>Stok: <strong style="color:#10B981;">${demand.user_stock || 0}</strong></span>
+              </div>
+              <div style="font-size:9px; color:#94A3B8; margin-top:4px; text-align:center;">
+                (Tıklayarak Roadmap'te bu adımı bulun)
+              </div>
+            `;
+            tooltip.style.display = "block";
+          }
+        });
+
+        g.addEventListener("mousemove", (evt) => {
+          if (tooltip) {
+            const cRect = canvasContainer.getBoundingClientRect();
+            tooltip.style.left = (evt.clientX - cRect.left + 16) + "px";
+            tooltip.style.top = (evt.clientY - cRect.top + 16) + "px";
+          }
+        });
+
+        g.addEventListener("mouseleave", () => {
+          edgeElements.forEach(item => {
+            item.el.classList.remove("highlighted");
+            item.el.classList.remove("dimmed");
+          });
+          Object.values(nodeElements).forEach(el => {
+            el.classList.remove("dimmed");
+            el.classList.remove("highlighted");
+          });
+          if (tooltip) tooltip.style.display = "none";
+        });
+
+        // Click navigates to and highlights step in roadmap
         g.onclick = () => {
-          currentTarget = n.item_name;
-          loadTrace(currentTarget, currentCapacity);
+          highlightRoadmapStep(n.item_name);
         };
 
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");

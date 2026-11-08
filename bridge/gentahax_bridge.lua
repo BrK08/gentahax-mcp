@@ -258,6 +258,7 @@ if type(RemoveHook) == "function" then
 end
 
 local poll_timer = 0
+local hb_timer = 0
 local first_ready_sent = false
 
 AddHook("OnRender", BRIDGE_ID, function(dt)
@@ -270,12 +271,24 @@ AddHook("OnRender", BRIDGE_ID, function(dt)
         end
     end
 
-    poll_timer = poll_timer + (tonumber(dt) or 0.016)
+    local d = tonumber(dt) or 0.016
+    poll_timer = poll_timer + d
     if poll_timer >= 0.75 then
         poll_timer = 0
         local content = bridge_poll_in()
         if content and #content > 0 then
             handle_command(content)
+        end
+    end
+
+    hb_timer = hb_timer + d
+    if hb_timer >= 1.2 then
+        hb_timer = 0
+        if type(makeRequest) == "function" then
+            local st = (type(mcp_live_full_status) == "function" and mcp_live_full_status()) or (type(mcp_world_snapshot) == "function" and mcp_world_snapshot()) or ""
+            if #st > 0 then
+                makeRequest(RELAY .. "/mass/heartbeat", "POST", {["Content-Type"] = "text/plain"}, st, 800)
+            end
         end
     end
 end)
