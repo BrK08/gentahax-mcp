@@ -299,7 +299,7 @@ Use responsibly and within the rules of your environment.
 
 <div align="center">
 
-### 👑 mr_berk
+### 👑 mr_berk.
 
 `GENTAHAX MCP v1.5.0` — Real data, ban-risk warnings, 45 tools, 6832 real item IDs
 
